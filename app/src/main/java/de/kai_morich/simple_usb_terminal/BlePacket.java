@@ -9,7 +9,6 @@ import androidx.annotation.RequiresApi;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -24,12 +23,22 @@ public class BlePacket {
     private LocalDateTime time;
     private double latt;
     private double longg;
-    private double heading;
+    private double magHeading;
+    private double potHeading;
+
+    private float battVoltage;
+
+    private float phoneCharge;
     private String addr;
     private byte rssi;
     private byte channel;
     private byte packet_type;
     private byte[] data;
+
+    // IMU data fields
+    private float[] accelerometerData;
+    private float[] magnetometerData;
+    private float[] gyroscopeData;
 
     /**
      * Constructor that grabs all necessary details about the current state of the device
@@ -38,7 +47,10 @@ public class BlePacket {
     @SuppressLint("NewApi")
     private BlePacket(String addr, byte rssi, byte channel, byte packet_type, byte[] data) {
         time = LocalDateTime.now();
-        heading = SensorHelper.getHeading();
+        magHeading = SensorHelper.getMagnetometerReadingSingleDim();
+        potHeading = SerialService.getPotAngle();
+        battVoltage = SerialService.getBatteryVoltage();
+        phoneCharge = SerialService.getPhoneChargePercent();
 
         Location location = LocationBroadcastReceiver.Companion.getCurrentLocation();
         if (location != null) {
@@ -54,6 +66,11 @@ public class BlePacket {
         this.channel = channel;
         this.packet_type = packet_type;
         this.data = data;
+
+        // Capture all IMU data
+        this.accelerometerData = SensorHelper.getAccelerometerReadingThreeDim().clone();
+        this.magnetometerData = SensorHelper.getMagnetometerReadingThreeDim().clone();
+        this.gyroscopeData = SensorHelper.getGyroscopeReadingThreeDim().clone();
     }
 
     /**
@@ -62,39 +79,50 @@ public class BlePacket {
      *
      * @return the newly created packet, or null if bytes was too short*/
     public static BlePacket parsePacket(byte[] bytes) {
+        // https://docs.silabs.com/bluetooth/6.2.0/bluetooth-stack-api/sl-bt-evt-scanner-extended-advertisement-report-s
         // scanner_evt_extended_advertisement_report ->
-        // A01B 0502    BGAPI identifier
-        // 00           event_flags
-        // E7 2B43 23A4 60 bd_addr
-        // 00           addr_type
-        // FF           bonding
-        // A5           rssi
-        // 26           channel
-        // 00 0000 0000 00 target_addr
-        // 00           target_addr_type
-        // FF           adv_sid
-        // 04           primary_phy
-        // 01           secondary_phy
-        // 7F           tx_power
-        // 0000         periodic interval
-        // 00           data completeness
-        // D3           counter
-        // ...          data
+//        A0 F7 05 01 83
+//        address - 52 9D B5 5E 39 90
+//        address type - 00
+//        bonding - FF
+//        primary phy - 04
+//        secondary phy - 04
+//        adv_sid - 00
+//        TX power -7F
+//        RSSI -C8
+//        Channel - 04
+//        periodic interval - 00
+//        00 E5
 
+            //251 total bytes in data sent by NCP over serial
+            //22 bytes of NCP header
+            //36 bytes of GATT header
+            //192 bytes of recorded capacitance data
 
 
         if (bytes.length < 31)
             return null;
+//        if (bytes.length > 600) {
+//            System.out.println("parsePacket: rejected overlong input of length " + bytes.length);
+//            return null;
+//        }
         String addr = "";
-        for(int i = 9; i > 4; i--){
+        for(int i = 10; i > 4; i--){ //extended BLE UUID
+        //for(int i = 9; i > 4; i--){ //Legacy BLE way
+        //for(int i = 0; i < 40; i++){//testing
             addr += String.format("%02X", bytes[i]) + ":";
         }
         addr = addr.substring(0, addr.length() - 1);
         byte packet_type = 0;
-        byte rssi = bytes[13];
-        byte channel = bytes[14];
+        byte rssi = bytes[17]; //17 for legacy BLE
+        byte channel = bytes[18]; //18 for legacy BLE
 
-        byte[] data = Arrays.copyOfRange(bytes, 31, bytes.length);
+        //byte[] data = Arrays.copyOfRange(bytes, 41, 284); //31 to byte.len for legacy BLE
+        //int dataStart =0; //for troubleshooting
+        int dataStart =32;
+        int dataEnd = Math.min(bytes.length, 274);  // Never go past byte 287
+        byte[] data = Arrays.copyOfRange(bytes, dataStart, dataEnd);
+
         return new BlePacket(addr, rssi, channel, packet_type, data);
     }
 
@@ -113,6 +141,40 @@ public class BlePacket {
     }
 
 
+    public boolean isComplete() {
+        if(data == null)
+            return false;
+        return data.length >= 241;
+    }
+
+    public int getDataLen() {
+        if (data == null) {
+            return 0;
+        }
+        return data.length;
+    }
+
+    /**
+     * Get accelerometer data (x, y, z)
+     */
+    public float[] getAccelerometerData() {
+        return accelerometerData.clone();
+    }
+
+    /**
+     * Get magnetometer data (x, y, z)
+     */
+    public float[] getMagnetometerData() {
+        return magnetometerData.clone();
+    }
+
+    /**
+     * Get gyroscope data (x, y, z)
+     */
+    public float[] getGyroscopeData() {
+        return gyroscopeData.clone();
+    }
+
     /**
      * Returns the contents of this packet in a human readable form
      * */
@@ -123,12 +185,35 @@ public class BlePacket {
         return time.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH:mm:ss"))
                 + "\nLat: " + latt
                 + "\nLong: " + longg
-                + "\nHead: " + heading
+                + "\nCompass Heading: " + magHeading
+                + "\nPotentiometer angle: " + potHeading
+                + "\nReceiver Battery Voltage: " + battVoltage
+                + "\nPhone Charge Percent" + phoneCharge
                 + "\nAddr: " + addr
                 + "\nRSSI: " + rssi
                 + "\nChannel: " + (channel & 0xFF /*'cast' to unsigned*/)
                 + "\nPacket Type: 0x" + String.format("%02X", packet_type)
+                + "\nAccelerometer (x,y,z): [" + String.format("%.3f, %.3f, %.3f", accelerometerData[0], accelerometerData[1], accelerometerData[2]) + "]"
+                + "\nMagnetometer (x,y,z): [" + String.format("%.3f, %.3f, %.3f", magnetometerData[0], magnetometerData[1], magnetometerData[2]) + "]"
+                + "\nGyroscope (x,y,z): [" + String.format("%.3f, %.3f, %.3f", gyroscopeData[0], gyroscopeData[1], gyroscopeData[2]) + "]"
                 + "\nData: " + TextUtil.toHexString(data);
+    }
+
+    /**
+     * Returns a simplified version with just address, RSSI, and truncated data
+     * */
+    @NonNull
+    public String toSimpleString() {
+        String dataHex = TextUtil.toHexString(data);
+        // Truncate data to first 40 characters
+        if (dataHex.length() > 40) {
+            dataHex = dataHex.substring(0, 40) + "…";
+        }
+        return "Addr: " + addr + " | RSSI: " + rssi + 
+               " | Mag: [" + String.format("%.1f, %.1f, %.1f", magnetometerData[0], magnetometerData[1], magnetometerData[2]) + "]" +
+               " | Acc: [" + String.format("%.1f, %.1f, %.1f", accelerometerData[0], accelerometerData[1], accelerometerData[2]) + "]" +
+               " | Gyro: [" + String.format("%.1f, %.1f, %.1f", gyroscopeData[0], gyroscopeData[1], gyroscopeData[2]) + "]" +
+               " | Data: " + dataHex;
     }
 
     @RequiresApi(api = Build.VERSION_CODES.O)
@@ -147,12 +232,19 @@ public class BlePacket {
         return time.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH:mm:ss"))
                 + "," + latt
                 + "," + longg
-                + "," + heading
+                + "," + potHeading
+                + "," + magHeading
+                + "," + battVoltage
+                + "," + phoneCharge
                 + "," + addr
                 + "," + rssi
                 + "," + (channel & 0xFF)
+                + "," + String.format("%.3f,%.3f,%.3f", accelerometerData[0], accelerometerData[1], accelerometerData[2])
+                + "," + String.format("%.3f,%.3f,%.3f", magnetometerData[0], magnetometerData[1], magnetometerData[2])
+                + "," + String.format("%.3f,%.3f,%.3f", gyroscopeData[0], gyroscopeData[1], gyroscopeData[2])
                 + "," + TextUtil.toHexString(data) + "\n";
     }
+
 
 
 

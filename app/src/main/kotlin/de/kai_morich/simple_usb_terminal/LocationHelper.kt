@@ -24,37 +24,45 @@ class LocationHelper constructor(private val context: Context) {
         LocationServices.getFusedLocationProviderClient(context)
 
     // Configure parameters according to our location needs
-    private val locationRequest: LocationRequest = LocationRequest.create().apply {
+    private var locationRequest: LocationRequest = LocationRequest.Builder(TimeUnit.SECONDS.toMillis(60)).apply {
         // Sets the desired interval for active location updates. This is inexact
-        interval = TimeUnit.MINUTES.toMillis(5)
-
-        // sets the fastest rate for active location updates. Will never be faster
-        fastestInterval = TimeUnit.MINUTES.toMillis(1)
-
-        //sets the max time between when location is reported
-        maxWaitTime = TimeUnit.MINUTES.toMillis(1)
-
-        //TODO: test how different the levels of power/accuracy change
-
-        // set our preference concerning power/accuracy
-        // 4 Options:
-        // +----------------------------------+------------------------------------------------------------------------------+
-        // | PRIORITY_BALANCED_POWER_ACCURACY | Tradeoff between accuracy and power usage                                    |
-        // | PRIORITY_HIGH_ACCURACY           | Favors highly accurate locations at the possible expense of extra power      |
-        // | PRIORITY_LOW_POWER               | Favors low power usage at the expense of location accuracy                   |
-        // | PRIORITY_PASSIVE                 | Ensure no extra power usage, only receives location as other clients request |
-        // +----------------------------------+------------------------------------------------------------------------------+
-        priority = Priority.PRIORITY_LOW_POWER
+//        setInterval(TimeUnit.MINUTES.toMillis(5))
+//
+//        // sets the fastest rate for active location updates. Will never be faster
+          setMinUpdateIntervalMillis(TimeUnit.SECONDS.toMillis(30))
+//
+//        //sets the max time between when location is reported
+          setMaxUpdateDelayMillis(TimeUnit.SECONDS.toMillis(60))
+//
+//        //TODO: test how different the levels of power/accuracy change
+//
+//        // set our preference concerning power/accuracy
+//        // 4 Options:
+//        // +----------------------------------+------------------------------------------------------------------------------+
+//        // | PRIORITY_BALANCED_POWER_ACCURACY | Tradeoff between accuracy and power usage                                    |
+//        // | PRIORITY_HIGH_ACCURACY           | Favors highly accurate locations at the possible expense of extra power      |
+//        // | PRIORITY_LOW_POWER               | Favors low power usage at the expense of location accuracy                   |
+//        // | PRIORITY_PASSIVE                 | Ensure no extra power usage, only receives location as other clients request |
+//        // +----------------------------------+------------------------------------------------------------------------------+
+        setPriority(Priority.PRIORITY_HIGH_ACCURACY)
 
         // other parameters of LocationRequest that may be worth messing with:
         // smallestDisplacement, expirationTime
-    }
+    }.build()
 
     fun changePriority(priority: Int) {
-        locationRequest.priority = priority
+        locationRequest = LocationRequest.Builder(locationRequest).setPriority(priority).build()
         startLocationUpdates()
     }
 
+    fun changeUpdateInterval(intervalSeconds: Long) {
+        locationRequest = LocationRequest.Builder(intervalSeconds * 1000).apply {
+            setMinUpdateIntervalMillis(intervalSeconds * 1000)
+            setMaxUpdateDelayMillis(intervalSeconds * 1000)
+            setPriority(locationRequest.priority)
+        }.build()
+        startLocationUpdates()
+    }
 
     // configure where we want the system to send the result of our request
     private val locationUpdatePendingIntent: PendingIntent by lazy {

@@ -25,9 +25,12 @@ import androidx.annotation.RequiresApi;
  * TODO: do I need to deregister sensor event listeners?
  * TODO: May not actually need to be a service?
  * */
+
 public class SensorHelper extends Service implements SensorEventListener {
 
-    float[] accelerometerReading = new float[3], magnetometerReading = new float[3];
+    static float[] magnetometerReading = new float[3];
+    static float[] gyroscopeReading = new float[3];
+    static float[] accelerometerReading = new float[3];
     //float[] potentiometerReading = new float[3];
     private static double heading = 0.0;
 
@@ -39,14 +42,17 @@ public class SensorHelper extends Service implements SensorEventListener {
         super.onCreate();
         SensorManager sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
 
-        //we subscribe to updates from the accelerometer and the magnetometer to get the most
-        // accurate heading reading possible
+        //we subscribe to updates from the accelerometer, magnetometer, and gyroscope to get the most
+        // accurate heading reading possible and full IMU data
         Sensor accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         Sensor magnetic = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        Sensor gyroscope = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE);
+        
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
         sensorManager.registerListener(this, magnetic, SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
-
-
+        if (gyroscope != null) {
+            sensorManager.registerListener(this, gyroscope, SensorManager.SENSOR_DELAY_NORMAL, SensorManager.SENSOR_DELAY_UI);
+        }
     }
 
     /**
@@ -60,7 +66,7 @@ public class SensorHelper extends Service implements SensorEventListener {
         return START_STICKY;
     }
 
-    public static void setHeading(double pot_angle)  {
+    public static void setHeading(float pot_angle)  {
         heading = pot_angle;
     }
 
@@ -68,29 +74,75 @@ public class SensorHelper extends Service implements SensorEventListener {
      * Returns the most recent measurement of the axis perpendicular to the surface of the earth
      * (I think)
      * */
-    public static double getHeading() {
+
+    public static double getMagnetometerReadingSingleDim() {
         return heading;
+    }
+
+    public static float[] getMagnetometerReadingThreeDim() {
+        if (magnetometerReading == null) {
+            magnetometerReading = new float[]{0.0f, 0.0f, 0.0f};
+        }
+        return magnetometerReading.clone();
+    }
+
+    public static float[] getAccelerometerReadingThreeDim() {
+        if (accelerometerReading == null) {
+            accelerometerReading = new float[]{0.0f, 0.0f, 0.0f};
+        }
+        return accelerometerReading.clone();
+    }
+
+    public static float[] getGyroscopeReadingThreeDim() {
+        if (gyroscopeReading == null) {
+            gyroscopeReading = new float[]{0.0f, 0.0f, 0.0f};
+        }
+        return gyroscopeReading.clone();
     }
 
     /**
      * Inherited from SensorEventListener.
      * Called by the system when there is new info from either of the sensors we
      * subscribed to (accelerometer, magnetometer). Does the math and saves the new heading
+     * todo: is the math correct?
      * */
+
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if (event == null)
+        if (event == null || event.values == null)
             return;
+
         if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-            accelerometerReading = event.values;
-        } else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
-            magnetometerReading = event.values;
+            if (event.values.length >= 3) {
+                accelerometerReading = event.values.clone();
+            }
         }
 
-        float[] rotationMatrix = new float[9];
-        SensorManager.getRotationMatrix(rotationMatrix, null, accelerometerReading, magnetometerReading);
-        float[] orientation = SensorManager.getOrientation(rotationMatrix, new float[3]);
-        //heading = (Math.toDegrees(orientation[0]));
+        else if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+            if (event.values.length >= 3) {
+                magnetometerReading = event.values.clone();
+            }
+        }
+
+        else if (event.sensor.getType() == Sensor.TYPE_GYROSCOPE) {
+            if (event.values.length >= 3) {
+                gyroscopeReading = event.values.clone();
+            }
+        }
+
+        // Only calculate heading if we have both accelerometer and magnetometer data
+        if (accelerometerReading != null && magnetometerReading != null) {
+            try {
+                float[] rotationMatrix = new float[9];
+                if (SensorManager.getRotationMatrix(rotationMatrix, null, accelerometerReading, magnetometerReading)) {
+                    float[] orientation = SensorManager.getOrientation(rotationMatrix, new float[3]);
+                    heading = (Math.toDegrees(orientation[0]));
+                }
+            } catch (Exception e) {
+                // Log error but don't crash
+                android.util.Log.e("SensorHelper", "Error calculating heading", e);
+            }
+        }
     }
 
     /**

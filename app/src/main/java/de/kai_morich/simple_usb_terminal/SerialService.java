@@ -8,6 +8,8 @@ import android.app.Service;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
+import android.os.BatteryManager;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Handler;
@@ -21,9 +23,12 @@ import androidx.annotation.RequiresApi;
 import androidx.core.app.NotificationCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import com.hoho.android.usbserial.driver.SerialTimeoutException;
-
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.Queue;
 
@@ -43,31 +48,14 @@ import java.util.Queue;
  * <p>
  * use listener chain: SerialSocket -> SerialService -> UI fragment
  */
-
 @RequiresApi(api = Build.VERSION_CODES.O)
 public class SerialService extends Service implements SerialListener {
 
-//    private enum RotationState {
-//        IN_BOUNDS_CW,
-//        IN_BOUNDS_CCW,
-//        RETURNING_TO_BOUNDS_CW,
-//        RETURNING_TO_BOUNDS_CCW,
-//    }
-
-    private enum NewRotationState {
-        MOVING_RIGHT,
-
-        STOPPED_RIGHT,
-
-        MOVING_LEFT,
-
-        STOPPED_LEFT,
-
-        TOO_FAR_RIGHT,
-
-        TOO_FAR_LEFT,
-
-        STOPPED,
+    private enum RotationState {
+        IN_BOUNDS_CW,
+        IN_BOUNDS_CCW,
+        RETURNING_TO_BOUNDS_CW,
+        RETURNING_TO_BOUNDS_CCW,
     }
 
     class SerialBinder extends Binder {
@@ -90,6 +78,7 @@ public class SerialService extends Service implements SerialListener {
         }
     }
 
+    private LocalDateTime lastHeadingTime;
     private final Handler mainLooper;
     private Handler motorHandler;
     private final IBinder binder;
@@ -102,22 +91,17 @@ public class SerialService extends Service implements SerialListener {
     private boolean connected;
 
     // rotation variables
-
-    private TerminalFragment terminalFragment;
-    private long messageDelay = 300; /*0.3 s*/
-    private long motorRotateTime = 1000; /*1 s*/
-    private long motorSleepTime = 100;  /*.5 s*/
-//    private int motorSpeed = 4; /* degrees per second */
-//    private double ExpectedAngleDistance = (motorRotateTime / 1000) * motorSpeed;
-//    private double ErrorWindow = ExpectedAngleDistance + (2 * (motorRotateTime / 1000));
-//    private RotationState rotationState = RotationState.IN_BOUNDS_CW;
-
-    private NewRotationState newRotationState = NewRotationState.STOPPED;
-    private static double minAngle = 0.0; // or -50?
-    private static double maxAngle = 450.0;
-    public double currentHeading = 0.0;
-    private static double headingMin = 75.0;
-    private static double headingMax = 395.0;
+    private final long motorRotateTime = 500; /*.5 s*/
+    private final long motorSleepTime = 10000; /*10 s*/
+    private RotationState rotationState = RotationState.IN_BOUNDS_CW;
+    private static double headingMin = 0.0;
+    //^^ default at 0 but user can set it to what they want.
+    private static double headingMax = 360.0;
+    //^^default to 360 but rewritten as what user wants.
+    private static double MotorHeadingMin = -60;
+    //^^ motor limit at -30
+    private static double MotorHeadingMax = 420;
+    //^^ motor limit at -30
     private static boolean treatHeadingMinAsMax = false;
     //in degrees, if the last time the motor moved less than this amount,
     // we assume the motor has stopped us and it is time to turn around
@@ -126,34 +110,27 @@ public class SerialService extends Service implements SerialListener {
     private final long temperatureInterval = 300000; /*5 min*/
     private Handler temperatureHandler;
 
+    private Handler batteryCheckHandler;
+
     private BlePacket pendingPacket;
     private byte[] pendingBytes = null;
     private static SerialService instance;
-    private TerminalFragment TFragJustToSend;
-    private int pot_bits;
-    private float pot_voltage;
-    public static float pot_angle;
-    private double minVoltage = 0.0;
-    private double maxVoltage = 0.0;
-    private double degreesPerVolt;
-    private int rotatorLimitReachedCounter = 0;
 
+    public static float potAngle = 0.0f;
 
-    private boolean rotateLock = false;
+    //adding to this pushes out the oldest element if the buffer is full, allowing for time series averaging and other functions
+    public AngleMeasSeries angleMeasSeries = new AngleMeasSeries(5);
 
-    private int outOfBoundsCounter = 0;
-    private int rotationCounter = 0;
-    private int stoppedCounter = 0;
-    private final int OUT_OF_BOUNDS_COUNTER_THRESHOLD = 3; //number of repeated measurements outside bounds before reversing direction
-    static int ROTATION_COUNTER_THRESHOLD = 6; // rotate time = this * motorSleepTime
-    static int STOPPED_COUNTER_THRESHOLD = 25; // stopped time = this * motorSleepTime
+    public static float lastBatteryVoltage = 0.0f;
 
-    private String updated_VtoA_message = ""; // screen message when voltage to angle interpretation is updated
-    private String outOfBoundsMessage = "";
-    private String randomDebuggingText = "";
+    private static int  phoneCharge = 0;
 
+    public static String lastCommand;
 
-    //Button Identifiers for detecting when buttons have been pressed
+    public static Boolean shouldbeMoving = false;
+
+    private static long lastEventTime = -1;
+
     public static final String KEY_STOP_MOTOR_ACTION = "SerialService.stopMotorAction";
     public static final String KEY_MOTOR_SWITCH_STATE = "SerialService.motorSwitchState";
     public static final String KEY_HEADING_RANGE_ACTION = "SerialService.headingRangeAction";
@@ -161,349 +138,380 @@ public class SerialService extends Service implements SerialListener {
     public static final String KEY_HEADING_MIN_AS_MAX_ACTION = "SerialService.headingRangePositiveAction";
     public static final String KEY_HEADING_MIN_AS_MAX_STATE = "SerialService.headingRangePositiveState";
 
+    // Packet buffering fields for improved serial communication
+    private final Object packetLock = new Object();
+    private byte[] packetBuffer = new byte[0];
+    private static final int MAX_PACKET_SIZE = 1024; // Adjust based on your protocol
+    private static final int MIN_PACKET_SIZE = 4; 
+    
+    // Processing queue for ordered operations
+    private final Queue<Runnable> processingQueue = new LinkedList<>();
+    private final Object processingLock = new Object();
+    
+    // Packet counters
+    private int blePacketsProcessed = 0;
+    private int angleBatteryPacketsProcessed = 0;
+    private int temperaturePacketsProcessed = 0;
+    private int knownResponsesProcessed = 0;
+    
+    // Truncation control
+    private boolean truncate = true;
+    
+    // Packet output format control
+    private boolean useDetailedPacketOutput = false;
+
     public static SerialService getInstance() {
         return instance;
     }
 
+    public static float getBatteryVoltage() { return lastBatteryVoltage; }
 
+    public static float getPhoneChargePercent() { return phoneCharge; }
 
-    private void rotationStateTransition(double current_angle) {
-
-        currentHeading = current_angle;
-        String rotateDirectionCommand = null;
-
-        //if the angle value is outside the possible range, just ignore it completely
-        if (current_angle < 0 || current_angle > 500 ) {
-            //some error handling
-            //todo: should track this in some way?
-        } else {
-            //state transition logic
-            switch (newRotationState) {
-
-                case MOVING_RIGHT:
-                    if (rotationCounter > ROTATION_COUNTER_THRESHOLD) {
-                        rotationCounter = 0;
-                        newRotationState = NewRotationState.STOPPED_RIGHT;
-                    }
-                    break;
-
-                case STOPPED_RIGHT:
-                    print_to_terminal(newRotationState.name());
-                    if (current_angle > headingMax) {
-                        newRotationState = NewRotationState.TOO_FAR_RIGHT;
-                        stoppedCounter = 0;
-                    } else if (stoppedCounter > STOPPED_COUNTER_THRESHOLD) {
-                        stoppedCounter = 0;
-                        newRotationState = NewRotationState.MOVING_RIGHT;
-                    }
-                    break;
-
-                case TOO_FAR_RIGHT:
-                    //if our out-of-bounds measurement was an error, go back to rotating right
-                    //todo: should we increment outOfBoundsCounter if a bad reading causes us to go back?
-                    if (current_angle < headingMax) {
-                        newRotationState = NewRotationState.MOVING_RIGHT;
-                    } else {
-                        if (outOfBoundsCounter > OUT_OF_BOUNDS_COUNTER_THRESHOLD) {
-                            newRotationState = NewRotationState.MOVING_LEFT;
-                            outOfBoundsCounter = 0;
-                        }
-                    }
-                    break;
-
-                case MOVING_LEFT:
-                    if (rotationCounter > ROTATION_COUNTER_THRESHOLD) {
-                        rotationCounter = 0;
-                        newRotationState = NewRotationState.STOPPED_LEFT;
-                    }
-                    break;
-
-                case STOPPED_LEFT:
-                    print_to_terminal(newRotationState.name());
-                    if (current_angle < headingMin) {
-                        newRotationState = NewRotationState.TOO_FAR_LEFT;
-                        stoppedCounter = 0;
-                    } else if (stoppedCounter > STOPPED_COUNTER_THRESHOLD) {
-                        stoppedCounter = 0;
-                        newRotationState = NewRotationState.MOVING_LEFT;
-                    }
-                    break;
-
-                case TOO_FAR_LEFT:
-                    if (current_angle > headingMin) {
-                        newRotationState = NewRotationState.MOVING_LEFT;
-                    } else {
-                        if (outOfBoundsCounter > OUT_OF_BOUNDS_COUNTER_THRESHOLD) {
-                            newRotationState = NewRotationState.MOVING_RIGHT;
-                            outOfBoundsCounter = 0;
-                        }
-                    }
-                    break;
-
-                case STOPPED:
-                    if (rotateLock) {
-                        //do some check
-                    } else {
-                        newRotationState = NewRotationState.MOVING_LEFT;
-                    }
-                    break;
-
-            }
-        }
-
-        //State Action Logic
-
-
-
-        //Right is Clockwise and left is Counterclockwise. You think of it as traversing a number line, with 0 degrees
-        //on the left and 445 degrees on the right.
-        switch (newRotationState) {
-            case MOVING_RIGHT:
-                rotateDirectionCommand = BGapi.ROTATE_CW;
-                rotationCounter++;
-                break;
-
-            case MOVING_LEFT:
-                rotateDirectionCommand = BGapi.ROTATE_CCW;
-                rotationCounter++;
-                break;
-
-            case TOO_FAR_RIGHT:
-
-            case TOO_FAR_LEFT:
-                outOfBoundsCounter++;
-
-            case STOPPED_RIGHT:
-
-            case STOPPED_LEFT:
-                stoppedCounter++;
-                rotateDirectionCommand = BGapi.ROTATE_STOP;
-                break;
-
-            case STOPPED:
-                rotateDirectionCommand = BGapi.ROTATE_STOP;
-                break;
-            default:
-                throw new IllegalStateException("Unexpected value: " + newRotationState);
-        }
-        if (rotateDirectionCommand != null) {
-            send(rotateDirectionCommand);
-        }
-
-//        print_to_terminal(newRotationState.name());
-
+    public static float getPotAngle() {
+        return potAngle;
     }
 
-    //todo: figure out how to just pass things directly to the terminalFragment to print
-    private void print_to_terminal(String str) {
-        Intent intent = new Intent(TerminalFragment.RECEIVE_HEADING_STATS);
-        intent.putExtra(TerminalFragment.RECEIVE_HEADING_EXTRA, str);
+    /**
+     * Get packet processing statistics
+     */
+    public int getBlePacketsProcessed() { return blePacketsProcessed; }
+    public int getAngleBatteryPacketsProcessed() { return angleBatteryPacketsProcessed; }
+    public int getTemperaturePacketsProcessed() { return temperaturePacketsProcessed; }
+    public int getKnownResponsesProcessed() { return knownResponsesProcessed; }
+    public int getTotalPacketsProcessed() { 
+        return blePacketsProcessed + angleBatteryPacketsProcessed + temperaturePacketsProcessed + knownResponsesProcessed; 
+    }
+
+    /**
+     * Get/set packet output format control
+     */
+    public boolean isUseDetailedPacketOutput() { return useDetailedPacketOutput; }
+    public void setUseDetailedPacketOutput(boolean useDetailed) { useDetailedPacketOutput = useDetailed; }
+
+    /**
+     * Creates an intent with the input string and passes it to Terminal Fragment, which then prints it
+     *
+     */
+    void print_to_terminal(String input) {
+        // Write to log file
+        writeToLogFile(input);
+        
+        // Original terminal printing logic
+        Intent intent = new Intent(TerminalFragment.GENERAL_PURPOSE_PRINT);
+        intent.putExtra(TerminalFragment.GENERAL_PURPOSE_STRING, input);
         LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(intent);
     }
 
+    /**
+     * Creates an intent with the input string and color, passes it to Terminal Fragment for colored output
+     */
+    void print_to_terminal(String input, int color) {
+        // Write to log file
+        writeToLogFile(input);
+        
+        // Colored terminal printing logic
+        Intent intent = new Intent(TerminalFragment.GENERAL_PURPOSE_PRINT_COLORED);
+        intent.putExtra(TerminalFragment.GENERAL_PURPOSE_STRING, input);
+        intent.putExtra(TerminalFragment.GENERAL_PURPOSE_COLOR, color);
+        LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(intent);
+    }
+
+    /**
+     * Write message to log file with timestamp
+     */
+    private void writeToLogFile(String message) {
+        try {
+            // Get external storage directory
+            File externalDir = getExternalFilesDir(null);
+            if (externalDir != null) {
+                File logFile = new File(externalDir, "serial_debug.log");
+                
+                // Create timestamp
+                String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"));
+                String logEntry = timestamp + " - " + message + "\n";
+                
+                // Append to file
+                FileWriter writer = new FileWriter(logFile, true);
+                writer.write(logEntry);
+                writer.close();
+            }
+        } catch (IOException e) {
+            Log.e("SerialService", "Error writing to log file", e);
+        }
+    }
+
+    /**
+     * Get the path to the debug log file
+     */
+    public String getLogFilePath() {
+        File externalDir = getExternalFilesDir(null);
+        if (externalDir != null) {
+            File logFile = new File(externalDir, "serial_debug.log");
+            return logFile.getAbsolutePath();
+        }
+        return null;
+    }
+
+    /**
+     * Clear the debug log file
+     */
+    public void clearLogFile() {
+        try {
+            File externalDir = getExternalFilesDir(null);
+            if (externalDir != null) {
+                File logFile = new File(externalDir, "serial_debug.log");
+                if (logFile.exists()) {
+                    logFile.delete();
+                }
+                print_to_terminal("Log file cleared");
+            }
+        } catch (Exception e) {
+            Log.e("SerialService", "Error clearing log file", e);
+        }
+    }
+
+    /**
+     * Debug method to analyze current buffer contents
+     */
+    public void debugBufferContents() {
+        synchronized (packetLock) {
+            print_to_terminal("=== BUFFER DEBUG ===");
+            print_to_terminal("Buffer size: " + packetBuffer.length);
+            if (packetBuffer.length > 0) {
+                print_to_terminal("First 32 bytes: " + bytesToHex(Arrays.copyOfRange(packetBuffer, 0, Math.min(32, packetBuffer.length))));
+                if (packetBuffer.length > 32) {
+                    print_to_terminal("Last 16 bytes: " + bytesToHex(Arrays.copyOfRange(packetBuffer, packetBuffer.length - 16, packetBuffer.length)));
+                }
+            }
+            
+            // Search for BLE packet pattern
+            int patternPos = findPacketPattern(packetBuffer);
+            if (patternPos >= 0) {
+                print_to_terminal("BLE Pattern found at position: " + patternPos);
+                int packetStart = patternPos - 22;
+                int packetEnd = patternPos + 252;
+                print_to_terminal("Would extract BLE packet from " + packetStart + " to " + packetEnd);
+                
+                if (packetStart >= 0 && packetEnd <= packetBuffer.length) {
+                    print_to_terminal("BLE packet extraction would be complete");
+                } else {
+                    print_to_terminal("BLE packet extraction would be incomplete");
+                }
+            } else {
+                print_to_terminal("BLE Pattern not found in buffer");
+            }
+            
+            // Search for angle/battery pattern
+            int angleBattPos = findAngleBatteryPattern(packetBuffer);
+            if (angleBattPos >= 0) {
+                print_to_terminal("Angle/Battery Pattern found at position: " + angleBattPos);
+                int packetStart = angleBattPos;
+                int packetEnd = angleBattPos + 8;
+                print_to_terminal("Would extract angle/battery packet from " + packetStart + " to " + packetEnd);
+                
+                if (packetEnd <= packetBuffer.length) {
+                    print_to_terminal("Angle/Battery packet extraction would be complete");
+                } else {
+                    print_to_terminal("Angle/Battery packet extraction would be incomplete");
+                }
+            } else {
+                print_to_terminal("Angle/Battery Pattern not found in buffer");
+            }
+            
+            print_to_terminal("=== END BUFFER DEBUG ===");
+        }
+    }
+
+    /**
+     * Display packet processing statistics
+     */
+    public void displayPacketStatistics() {
+        print_to_terminal("=== PACKET STATISTICS ===");
+        print_to_terminal("BLE Packets: " + blePacketsProcessed);
+        print_to_terminal("Angle/Battery Packets: " + angleBatteryPacketsProcessed);
+        print_to_terminal("Temperature Packets: " + temperaturePacketsProcessed);
+        print_to_terminal("Known Responses: " + knownResponsesProcessed);
+        print_to_terminal("Total Packets: " + getTotalPacketsProcessed());
+        print_to_terminal("=== END STATISTICS ===");
+    }
+
+    void send_heading_intent() {
+        Intent intent = new Intent(TerminalFragment.RECEIVE_HEADING_STATE);
+        intent.putExtra(TerminalFragment.RECEIVE_ROTATION_STATE, rotationState.toString());
+        intent.putExtra(TerminalFragment.RECEIVE_ANGLE, potAngle);
+        LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(intent);
+    }
+
+    void send_battery_intent() {
+        Intent intent = new Intent(TerminalFragment.RECEIVE_BATTERY_VOLTAGE);
+        intent.putExtra(TerminalFragment.BATTERY_VOLTAGE, lastBatteryVoltage);
+        LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(intent);
+    }
+
+    /**Used to set lastCommand so that the tracker doesn't automatically stop commands sent via UI
+     *
+     * @param str the command that TerminalFragment is about to send to the gecko
+     */
+    void setLastCommand(String str) {
+        if (str.equals(BGapi.ROTATE_CCW) || str.equals(BGapi.ROTATE_CW) || str.equals(BGapi.ROTATE_STOP)) {
+            lastCommand = str;
+        }
+    }
+
+    static SerialService.RotationState lastRotationState = null;
+    /**
+     * Checks if the state of the rotate state machine has changed since last time, and if it has,
+     * prints the state and decision variables for debugging.
+     *
+     */
+    void rotateRunnable_statePrint(SerialService.RotationState newRotationState) {
+        if (lastRotationState == null || lastRotationState != newRotationState) {
+            String headingInfo = "currentHeading: "+ potAngle
+                    + "\nmin: "+headingMin+"\nmax: "+headingMax
+                    + "\nminAsMax: "+treatHeadingMinAsMax
+                    + "\nstate: "+rotationState ;
+
+            print_to_terminal(headingInfo);
+        }
+        lastRotationState = newRotationState;
+    }
 
     // The packaged code sample that moves the motor and checks if it is time to turn around
+
     private final Runnable rotateRunnable = new Runnable() {
 
         @Override
         public void run() {
 
-            if (connected) {
+            try {
+                if (connected) {
 
-                send(BGapi.GET_ANGLE);
+                    double oldHeading = SensorHelper.getMagnetometerReadingSingleDim();
+                    String rotateCommand = BGapi.ROTATE_STOP;
+                    if (rotationState == RotationState.IN_BOUNDS_CW || rotationState == RotationState.RETURNING_TO_BOUNDS_CW)
+                        rotateCommand = BGapi.ROTATE_CW;
+                    else
+                        rotateCommand = BGapi.ROTATE_CCW;
 
-//                try {
-//                    write(TextUtil.fromHexString(BGapi.GET_ANGLE));
-//                } catch (IOException e) {
-//                    throw new RuntimeException(e);
-//                }
+                    lastCommand = rotateCommand;
 
+                    //start rotation
+                    write(TextUtil.fromHexString(rotateCommand));
+                    shouldbeMoving = true;
 
-//                double oldHeading = pot_angle;
-//                double oldVoltage = pot_voltage;
-
-//                TFragJustToSend = TerminalFragment.getInstance();
-
-
-////                if (rotationState == RotationState.IN_BOUNDS_CW || rotationState == RotationState.RETURNING_TO_BOUNDS_CW)
-//                    rotateCommand = BGapi.ROTATE_CW;
-//                else
-//                    rotateCommand = BGapi.ROTATE_CCW;
-
-//                TFragJustToSend.send(rotateCommand);
-
-//                SystemClock.sleep(messageDelay); //todo: is this blocking? If so, should not be, wow
-//                TFragJustToSend.send(BGapi.ROTATE_FAST);
-//                SystemClock.sleep(motorRotateTime);
-//                TFragJustToSend.send(BGapi.ROTATE_STOP);
-//                SystemClock.sleep(messageDelay);
-//
-//                TFragJustToSend.send(BGapi.GET_ANGLE);
-//                SystemClock.sleep(messageDelay);
-//                currentHeading = pot_angle;
-//
-//                // Here's a filter!
-//                double differenceVoltage = Math.abs(pot_voltage - oldVoltage);
-//                if (minVoltage != 0 && maxVoltage != 0) { // Have minV and maxV been calculated?
-//                    if (differenceVoltage >= ((maxVoltage - minVoltage) / 12)) {
-//                        currentHeading = oldHeading;
-//                    }
-//                } else {
-//                    if (differenceVoltage >= (2.6 / 12)) { // 2.6 is what maxV - minV should be close to
-//                        currentHeading = oldHeading;
-//                    }
-//                }
-//
-//
-////                //ask for the current angle
-////                String angleQuery = BGapi.GET_ANGLE;
-////                write(TextUtil.fromHexString(angleQuery)); //send data to chip to get angle data
-////                SystemClock.sleep(messageDelay);
-////
-////                //determine whether to rotate clockwise or counter clockwise
-////                double oldHeading = SensorHelper.getHeading();
-////                String rotateCommand;
-////                if(rotationState == RotationState.IN_BOUNDS_CW || rotationState == RotationState.RETURNING_TO_BOUNDS_CW)
-////                    rotateCommand = BGapi.ROTATE_CW;
-////                else
-////                    rotateCommand = BGapi.ROTATE_CCW;
-////
-////                //command motor to turn how we want
-////                String rotationSpeed = BGapi.ROTATE_FAST;
-////
-////                write(TextUtil.fromHexString(rotationSpeed));
-////                SystemClock.sleep(messageDelay);
-////                write(TextUtil.fromHexString(rotateCommand));
-////                SystemClock.sleep(motorRotateTime);
-////                write(TextUtil.fromHexString(BGapi.ROTATE_STOP));
-////                SystemClock.sleep(messageDelay);
-////
-////                //determine new rotation state
-////                double currentHeading = SensorHelper.getHeading();
-//
-////                if (treatHeadingMinAsMax) {
-////                    if (Math.abs(oldVoltage - pot_voltage) < 0.00115) {
-////                        rotatorLimitReachedCounter++;
-////                        updated_VtoA_message = updated_VtoA_message + "\nStopped rotating " + rotatorLimitReachedCounter + " time(s)";
-////
-////                        if (rotatorLimitReachedCounter == 5) {
-////                            rotatorLimitReachedCounter = 0;
-////
-////                            if (rotateCommand == BGapi.ROTATE_CW) {
-////                                maxVoltage = pot_voltage;
-////                                updated_VtoA_message = updated_VtoA_message + "\nMax Voltage Updated";
-////                                rotationState = RotationState.IN_BOUNDS_CCW;
-////                            } else {
-////                                minVoltage = pot_voltage;
-////                                updated_VtoA_message = updated_VtoA_message + "\nMin Voltage Updated";
-////                                rotationState = RotationState.IN_BOUNDS_CW;
-////                            }
-////
-////                            if (!(minVoltage == 0.0) && !(maxVoltage == 0.0)) {
-////                                degreesPerVolt = 450 / (maxVoltage - minVoltage);
-////                                updated_VtoA_message = updated_VtoA_message + "\nVoltage-Angle Interpretation Updated";
-////                            }
-////                        }
-////                    } else {
-////                        rotatorLimitReachedCounter = 0;
-////                        updated_VtoA_message = "";
-////                    }
-////                }
-//
-//                switch (rotationState) {
-//                    case IN_BOUNDS_CW: // 0<--|====== >-> ====|-->360
-//                        // turn around once we pass the max
-//                        if (OutsideUpperBound(currentHeading)) {
-//                            outOfBoundsCounter ++;
-//                            outOfBoundsMessage = outOfBoundsMessage + "\nout of bounds " + outOfBoundsCounter + "time(s)";
-//                            if (outOfBoundsCounter >= 3) {
-//                                rotationState = RotationState.RETURNING_TO_BOUNDS_CCW;
-//                                outOfBoundsCounter = 0;
-//                                outOfBoundsMessage = outOfBoundsMessage + "\nturned around";
-//                            }
-//                        } else if (OutsideLowerBound(currentHeading)) {             // if it gets off, make sure it knows it's outside bounds
-//                            rotationState = RotationState.RETURNING_TO_BOUNDS_CW;   // and set it on a course towards what is most likely the nearest bound
-//                        } else {
-//                            outOfBoundsCounter = 0;
-//                            outOfBoundsMessage = "";
-//                        }
-//                        break;
-//                    case IN_BOUNDS_CCW: // 0<--|== <-< ======|-->360
-//                        // turn around once we pass the min
-//                        if(OutsideLowerBound(currentHeading)) {
-//                            outOfBoundsCounter ++;
-//                            outOfBoundsMessage = outOfBoundsMessage + "\nout of bounds " + outOfBoundsCounter + "time(s)";
-//                            if (outOfBoundsCounter >= 3) {
-//                                rotationState = RotationState.RETURNING_TO_BOUNDS_CW;
-//                                outOfBoundsCounter = 0;
-//                                outOfBoundsMessage = outOfBoundsMessage + "\nturned around";
-//                            }
-//                        } else if (OutsideUpperBound(currentHeading)) {             // if it gets off, make sure it knows it's outside bounds
-//                            rotationState = RotationState.RETURNING_TO_BOUNDS_CCW;  // and set it on a course towards what is most likely the nearest bound
-//                        } else {
-//                            outOfBoundsCounter = 0;
-//                            outOfBoundsMessage = "";
-//                        }
-//                        break;
-//                    case RETURNING_TO_BOUNDS_CW: // 0<-- >-> |========|-->360
-//                        // set to back in bounds after passing the min
-//                        //   and continue CW
-//                        if(InsideBounds(currentHeading)) {
-//                            rotationState = RotationState.IN_BOUNDS_CW;
-//                        } else if (OutsideUpperBound(currentHeading)) {             // if it gets off, make sure it knows it's outside the other bound
-//                            rotationState = RotationState.RETURNING_TO_BOUNDS_CCW;  // and set it on a course towards what is most likely the nearest bound
-//                        } else {
-//                            outOfBoundsMessage = "";
-//                        }
-//                        break;
-//                    case RETURNING_TO_BOUNDS_CCW: // 0<--|======| <-< -->360
-//                        // set back to in bounds after passing the max
-//                        //   and continue CCW
-//                        if(InsideBounds(currentHeading)) {
-//                            rotationState = RotationState.IN_BOUNDS_CCW;
-//                        } else if (OutsideLowerBound(currentHeading)) {             // if it gets off, make sure it knows it's outside the other bound
-//                            rotationState = RotationState.RETURNING_TO_BOUNDS_CW;   // and set it on a course towards what is most likely the nearest bound
-//                        } else {
-//                            outOfBoundsMessage = "";
-//                        }
-//                        break;
-//                }
+                    //wait motorRotateTime, then stop rotation
+                    motorHandler.postDelayed(() -> {
+                        try {
+                            shouldbeMoving = false;
+                            write(TextUtil.fromHexString(BGapi.ROTATE_STOP));
+                            lastCommand = BGapi.ROTATE_STOP;
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }, motorRotateTime);
 
 
-                //print current info to screen
+                    //previous code to swivel the motor indefinitely
+//                    double currentHeading = SensorHelper.getHeading(); //+180;
+                    double currentHeading = potAngle;
+
+                    //valid range goes around 0, such as 90->120
+                    //where ---- is out of bounds and ==== is in bounds,
+                    //and <-< or >-> marks the current heading and direction
+                    // 0<----|========|----->360
+                    switch (rotationState) {
+                        case IN_BOUNDS_CW: // 0<--|====== >-> ====|-->360
+                            // turn around once we pass the max
+                            if (OutsideUpperBound(currentHeading)) {
+                                rotationState = RotationState.RETURNING_TO_BOUNDS_CCW;
+                            } else if (OutsideLowerBound(currentHeading)) {             // if it gets off, make sure it knows it's outside bounds
+                                rotationState = RotationState.RETURNING_TO_BOUNDS_CW;   // and set it on a course towards what is most likely the nearest bound
+                            }
+                            break;
+                        case IN_BOUNDS_CCW: // 0<--|== <-< ======|-->360
+                            // turn around once we pass the min
+                            if (OutsideLowerBound(currentHeading)) {
+                                rotationState = RotationState.RETURNING_TO_BOUNDS_CW;
+                            } else if (OutsideUpperBound(currentHeading)) {             // if it gets off, make sure it knows it's outside bounds
+                                rotationState = RotationState.RETURNING_TO_BOUNDS_CCW;  // and set it on a course towards what is most likely the nearest bound
+                            }
+                            break;
+                        case RETURNING_TO_BOUNDS_CW: // 0<-- >-> |========|-->360
+                            // set to back in bounds after passing the min
+                            //   and continue CW
+                            if (InsideBounds(currentHeading)) {
+                                rotationState = RotationState.IN_BOUNDS_CW;
+                            } else if (OutsideUpperBound(currentHeading)) {             // if it gets off, make sure it knows it's outside the other bound
+                                rotationState = RotationState.RETURNING_TO_BOUNDS_CCW;  // and set it on a course towards what is most likely the nearest bound
+                            }
+                            break;
+                        case RETURNING_TO_BOUNDS_CCW: // 0<--|======| <-< -->360
+                            // set back to in bounds after passing the max
+                            //   and continue CCW
+                            if (InsideBounds(currentHeading)) {
+                                rotationState = RotationState.IN_BOUNDS_CCW;
+                            } else if (OutsideLowerBound(currentHeading)) {             // if it gets off, make sure it knows it's outside the other bound
+                                rotationState = RotationState.RETURNING_TO_BOUNDS_CW;   // and set it on a course towards what is most likely the nearest bound
+                            }
+                            break;
+                    }
+
+//                    System.out.println("About to write headings to firebase service companion");
 
 
-                //Only print the heading at the end of each movement
-                if (rotationCounter == ROTATION_COUNTER_THRESHOLD) {
-                    String headingInfo = "\ncurrentHeading: " + currentHeading
-//                            + "\noldHeading: " + oldHeading
-                            + "\nmin: " + headingMin + "\nmax: " + headingMax
-//                            + "\nminAsMax: " + treatHeadingMinAsMax
-                            + "\nstate: " + newRotationState
-                            + "\nminV: " + minVoltage
-                            + "\nmaxV: " + maxVoltage
-                            + "\nAperV: " + degreesPerVolt
-                            + "\nVoltage: " + pot_voltage
-                            + "\nBits: " + pot_bits
-                            + updated_VtoA_message
-                            + outOfBoundsMessage
-                            + randomDebuggingText;
-                    Intent intent = new Intent(TerminalFragment.RECEIVE_HEADING_STATS);
-                    intent.putExtra(TerminalFragment.RECEIVE_HEADING_EXTRA, headingInfo);
-                    LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(intent);
 
-//                //save rotation status to firebase log
-//                FirebaseService.Companion.getServiceInstance().appendHeading(
-//                        currentHeading, headingMin, headingMax, treatHeadingMinAsMax, oldHeading, rotationState.toString());
-                    //save rotation status to firebase log
-//                    FirebaseService.Companion.getServiceInstance().appendHeading(
-//                            currentHeading, headingMin, headingMax, treatHeadingMinAsMax, newRotationState.toString());
+                    if (lastHeadingTime == null) {
+                        lastHeadingTime = LocalDateTime.now();
+                    }
+
+                    // Get GPS data from LocationBroadcastReceiver
+                    String latitude = "0.0";
+                    String longitude = "0.0";
+                    if (de.kai_morich.simple_usb_terminal.LocationBroadcastReceiver.currentLocation != null) {
+                        latitude = String.valueOf(de.kai_morich.simple_usb_terminal.LocationBroadcastReceiver.currentLocation.getLatitude());
+                        longitude = String.valueOf(de.kai_morich.simple_usb_terminal.LocationBroadcastReceiver.currentLocation.getLongitude());
+                        Log.d("SerialService", "GPS data available: lat=" + latitude + ", lon=" + longitude);
+                    } else {
+                        Log.d("SerialService", "GPS data not available, using default values");
+                    }
+
+                    // Get sensor data
+                    float[] accelData = SensorHelper.getAccelerometerReadingThreeDim();
+                    float[] magData = SensorHelper.getMagnetometerReadingThreeDim();
+                    float[] gyroData = SensorHelper.getGyroscopeReadingThreeDim();
+
+                    String headingStr = String.join(", ",
+                            lastHeadingTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH:mm:ss")),
+                            String.valueOf(currentHeading),
+                            latitude,
+                            longitude,
+                            String.valueOf(accelData[0]) + "," + String.valueOf(accelData[1]) + "," + String.valueOf(accelData[2]),
+                            String.valueOf(magData[0]) + "," + String.valueOf(magData[1]) + "," + String.valueOf(magData[2]),
+                            String.valueOf(gyroData[0]) + "," + String.valueOf(gyroData[1]) + "," + String.valueOf(gyroData[2]),
+                            String.valueOf(headingMin),
+                            String.valueOf(headingMax),
+                            String.valueOf(treatHeadingMinAsMax),
+                            String.valueOf(oldHeading),
+                            rotationState.toString(),
+                            "\n"
+                    );
+
+                    FirebaseService.Companion.getServiceInstance().appendHeading(headingStr);
+                    Log.d("SerialService", "Heading data written to Firebase: " + headingStr.substring(0, Math.min(headingStr.length(), 100)) + "...");
+//                    System.out.println("Wrote headings to firebase service companion: " + headingStr);
+
                 }
-            }
 
-            //As long as we are to continue moving, schedule this method to be run again
-            if (isMotorRunning) {
-                motorHandler.postDelayed(this, motorSleepTime);
+                rotateRunnable_statePrint(rotationState);
+
+                //As long as we are to continue moving, schedule this method to be run again
+                if (isMotorRunning) {
+                    motorHandler.postDelayed(this, motorSleepTime);
+                }
+            } catch (IOException e) {
+                Toast.makeText(getApplicationContext(), e.getMessage(), Toast.LENGTH_SHORT).show();
+                e.printStackTrace();
             }
 
 
@@ -511,48 +519,32 @@ public class SerialService extends Service implements SerialListener {
 
         // for treatHeadingMinAsMax == false
         private boolean InsideBounds(double heading) {
-            if(heading <= headingMax && heading >= headingMin) { return true; } else { return false; }
+            return (heading <= headingMax && heading >= headingMin);
         }
 
         private boolean OutsideLowerBound(double heading) {
-            if(heading >= minAngle && heading < headingMin) {return true; } else { return false; }
+            return (heading >= MotorHeadingMin && heading < headingMin);
         }
 
         private boolean OutsideUpperBound(double heading) {
-            if(heading > headingMax && heading < maxAngle) {return true; } else { return false; }
+            //if(heading < 366)
+            return (heading > headingMax && heading < MotorHeadingMax);
         }
 
         // for treatHeadingMinAsMax == true
         private boolean InsideUpperBound(double heading) {
-            if(heading >= headingMax && heading < maxAngle) {return true; } else { return false; }
+            return (heading >= headingMax && heading < MotorHeadingMax);
         }
 
         private boolean InsideLowerBound(double heading) {
-            if(heading >= minAngle && heading <= headingMin) {return true; } else { return false; }
+            return (heading >= MotorHeadingMin && heading <= headingMin);
         }
 
         private boolean OutsideBounds(double heading) {
-            if( heading > headingMin && heading < headingMax ) {return true; } else { return false; }
+            return (heading > headingMin && heading < headingMax);
         }
 
     };
-
-    public void send(String str) {
-        try {
-            String msg;
-            byte[] data;
-            StringBuilder sb = new StringBuilder();
-            TextUtil.toHexString(sb, TextUtil.fromHexString(str));
-//            TextUtil.toHexString(sb, newline.getBytes());
-            msg = sb.toString();
-            data = TextUtil.fromHexString(msg);
-            write(data);
-        } catch (SerialTimeoutException e) {
-//            status("write timeout: " + e.getMessage();
-        } catch (Exception e) {
-            onSerialIoError(e);
-        }
-    }
 
     private final Runnable temperatureRunnable = new Runnable() {
         @Override
@@ -568,6 +560,24 @@ public class SerialService extends Service implements SerialListener {
         }
     };
 
+    private static BatteryManager bm;
+
+    private final Runnable batteryCheckRunnable = new Runnable() { //written by GPT 3.5 with prompts from Coby's code
+
+        @Override
+        public void run() {
+            bm = (BatteryManager) getSystemService(Context.BATTERY_SERVICE);
+            phoneCharge = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+            print_to_terminal("Read Phone battery level: " + phoneCharge);
+            System.out.print("Battery level " +  String.valueOf(phoneCharge) + "\n");
+
+            Log.d("BatteryLevel", String.valueOf(phoneCharge));
+
+            batteryCheckHandler.postDelayed(batteryCheckRunnable, 60 * 1000); //delay
+        }
+    };
+
+
     /**
      * Lifecycle
      */
@@ -579,8 +589,9 @@ public class SerialService extends Service implements SerialListener {
 
         instance = this;
 
-        startMotorHandler();
+        startRotationHandler();
         startTemperatureHandler();
+        startBatteryCheckHandler();
     }
 
     /**
@@ -599,7 +610,7 @@ public class SerialService extends Service implements SerialListener {
     /**
      * Create the Handler that will regularly call the code in rotateRunnable
      */
-    private void startMotorHandler() {
+    private void startRotationHandler() {
         Looper looper = Looper.myLooper();
         if (looper != null) {
             motorHandler = new Handler(looper);
@@ -612,6 +623,14 @@ public class SerialService extends Service implements SerialListener {
         if (looper != null) {
             temperatureHandler = new Handler(looper);
             temperatureHandler.postDelayed(temperatureRunnable, 5000);
+        }
+    }
+
+    private void startBatteryCheckHandler() {
+        Looper looper = Looper.myLooper();
+        if (looper != null) {
+            batteryCheckHandler = new Handler(looper);
+            batteryCheckHandler.post(batteryCheckRunnable);
         }
     }
 
@@ -679,7 +698,7 @@ public class SerialService extends Service implements SerialListener {
      * <p>
      * This method is expected to be used by UI elements i.e. TerminalFragment
      */
-    public void attach(SerialListener listener) {
+    public void attach(SerialListener listener) throws IOException {
         //Not entirely sure why this is necessary
         if (Looper.getMainLooper().getThread() != Thread.currentThread())
             throw new IllegalArgumentException("not in main thread");
@@ -824,122 +843,37 @@ public class SerialService extends Service implements SerialListener {
         }
     }
 
-    public void onSerialRead(byte[] data) {
+    public void onSerialRead(byte[] data) throws IOException {
         if (connected) {
-            //TODO find a more organized way to do this parsing
-
-            // parse here to determine if it should be sent to FirebaseService too
-            if (BGapi.isScanReportEvent(data)) {
-                //this is the beginning of a new report event, therefore we assume that
-                // if a packet is pending, it is complete and save it before parsing the most
-                // recent data
-//                randomDebuggingText = "";
-//                randomDebuggingText = randomDebuggingText + "WE GOT A PACKET!!!!!!";
-                String length_str = String.valueOf(data.length);
-                print_to_terminal(length_str);
-                if (pendingPacket != null) {
-                    FirebaseService.Companion.getServiceInstance().appendFile(pendingPacket.toCSV());
+            // Thread-safe packet buffering
+            synchronized (packetLock) {
+                // Append new data to buffer
+                packetBuffer = appendByteArray(packetBuffer, data);
+                
+                // Process complete packets from buffer
+                while (processNextPacket()) {
+                    // Continue processing until no complete packets remain
                 }
-
-
-                BlePacket temp = BlePacket.parsePacket(data);
-                //did the new data parse successfully?
-                if (temp != null) {
-                    //Yes - save the packet
-                    pendingPacket = temp;
-                } else {
-                    //No - save the raw bytes
-                    pendingBytes = data;
-                }
-//                print_to_terminal(String.valueOf(pendingBytes.length));
-
-            } else if (BGapi.isAngleResponse(data)) {
-                byte[] lastTwoBytes = new byte[2];
-                // Extract the last 2 bytes
-                System.arraycopy(data, data.length, lastTwoBytes, 0, 2); //data bytes are in 14th and 15th positions in the array
-
-                // Extract the most significant 12 bits into an integer
-                pot_bits = ((lastTwoBytes[0] & 0xFF) << 4) | ((lastTwoBytes[1] & 0xF0) >>> 4);
-
-                // multiply by 1/2^12 (adc resolution)
-                pot_voltage = (float) (pot_bits * 0.002);
-
-                //converts voltage to angle based on calibrated min and max values
-                //before min and max values have been run into and measured, uses pre-measured values
-                if (minVoltage == 0 || maxVoltage == 0) {
-                    pot_angle = (float) (((pot_voltage - 0.332) / (2.7 - 0.332)) * 360);
-                } else {
-                    pot_angle = (float) ((pot_voltage - minVoltage) * degreesPerVolt);
-                }
-
-                rotationStateTransition(pot_angle);
-
-
-                //call rotation state logic
-
-
-                //pot_angle = (float) (((pot_voltage - 0.332) / (3.3 - 0.332)) * 360);
-
-
-
-                //float angle_voltage = data[data.length - 4]; //last 4 bytes of response contain voltage payload
-                //pot_angle = (float) (((angle_voltage - 0.332) / (2.7 - 0.332)) * 360);
-
-                //voltage scales from 0.037 to 2.98 across 450 degrees of rotation (need measurements for angle extent on either side
-                //angle should be ((angle_voltage - 0.037) / (2.98 - 0.028) * 450) - some_offset
-                //with the offset depending on how we want to deal with wrapping around 0
-
-                //** CLOCKWISE = higher voltage, counterclockwise = lower voltage
-
-                //where incrementing degrees takes you clockwise:
-                // 2.96V is about 405 degrees (really right on tbh)
-                //2.7V is 360 degrees
-                //1.5V is 180 degrees
-                //0.322V is 0 degrees
-                //0.037V is about -45 degrees
-
-            } else if (BGapi.isTemperatureResponse(data)) {
-                //parse and store somewhere (FirebaseService?)
-                int temp = data[data.length - 2];
-                FirebaseService.Companion.getServiceInstance().appendTemp(temp);
-            } else if ("message_system_boot".equals(BGapi.getResponseName(data))) {
-                //TODO: this is definitely just a bandaid for the real problem of the gecko rebooting
-                //the gecko mysteriously reset, so resend the setup and start commands
-                try {
-//                    write(TextUtil.fromHexString(BGapi.SCANNER_SET_MODE));
-//                    write(TextUtil.fromHexString(BGapi.SCANNER_SET_TIMING));
-//                    write(TextUtil.fromHexString(BGapi.CONNECTION_SET_PARAMETERS));
-                    write(TextUtil.fromHexString(BGapi.SCANNER_START));
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            } else if (!BGapi.isKnownResponse(data)) {
-                //If the data isn't any kind of thing we can recognize, assume it's incomplete
-
-                //If there's already partial data waiting
-                if (pendingBytes != null) {
-                    //add this data to the end of it
-                    pendingBytes = appendByteArray(pendingBytes, data);
-
-                    //and try to parse it again
-                    BlePacket temp = BlePacket.parsePacket(pendingBytes);
-                    if (temp != null) {
-                        pendingPacket = temp;
-                        pendingBytes = null;
-                    }
-                }
-                //and if not, try to add it to the end of pending packet
-                else if (pendingPacket != null) {
-                    pendingPacket.appendData(data);
+                
+                // Prevent buffer overflow
+                if (packetBuffer.length > MAX_PACKET_SIZE) {
+                    Log.w("SerialService", "Buffer overflow, clearing buffer");
+                    packetBuffer = new byte[0];
+                    pendingPacket = null;
+                    pendingBytes = null;
                 }
             }
 
-            //original content of method
+            // Forward to UI listener (original logic)
             synchronized (this) {
                 if (uiFacingListener != null) {
                     mainLooper.post(() -> {
                         if (uiFacingListener != null) {
-                            uiFacingListener.onSerialRead(data);
+                            try {
+                                uiFacingListener.onSerialRead(data);
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
                         } else {
                             queue1.add(new QueueItem(QueueType.Read, data, null));
                         }
@@ -952,6 +886,378 @@ public class SerialService extends Service implements SerialListener {
     }
 
     /**
+     * Process the next complete packet from the buffer
+     * @return true if a packet was processed, false if no complete packet available
+     */
+    private boolean processNextPacket() {
+        if (packetBuffer.length < MIN_PACKET_SIZE) {
+            return false; // Not enough data for even a minimal packet
+        }
+
+        // Check for angle/battery response
+        int angleBattPatternStart = findAngleBatteryPattern(packetBuffer);
+        if (angleBattPatternStart >= 0) {
+            return processAngleBatteryResponseWithPattern(angleBattPatternStart);
+        }
+
+        // Check for temperature response
+        if (BGapi.isTemperatureResponse(packetBuffer)) {
+            return processTemperatureResponse();
+        }
+
+        // Check for scan report event (BLE packet) using pattern matching
+        int patternStart = findPacketPattern(packetBuffer);
+        if (patternStart >= 0) {
+            return processBlePacketWithPattern(patternStart);
+        }
+//        else {
+//            // Debug: Print buffer info when pattern is not found
+//            String debugInfo = "Packet pattern not found - Buffer size: " + packetBuffer.length +
+//                             ", First 16 bytes: " + bytesToHex(Arrays.copyOfRange(packetBuffer, 0, Math.min(16, packetBuffer.length)));
+//            print_to_terminal(debugInfo);
+//        }
+        
+
+        
+        // Check for known responses
+        if (BGapi.isKnownResponse(packetBuffer)) {
+            return processKnownResponse();
+        }
+        
+        // If we can't identify the packet type, try to find a known response pattern
+        return findAndProcessKnownPattern();
+    }
+
+    /**
+     * Find the packet pattern in the buffer
+     * @param buffer The buffer to search in
+     * @return The starting position of the pattern, or -1 if not found
+     */
+    private int findPacketPattern(byte[] buffer) {
+        // Pattern to search for: 02 01 04 05 04 08 42 59 55 F8
+        byte[] pattern = {(byte) 0x02, (byte) 0x01, (byte) 0x04, (byte) 0x05, 
+                         (byte) 0x04, (byte) 0x08, (byte) 0x42, (byte) 0x59, 
+                         (byte) 0x55, (byte) 0xF8};
+        
+        for (int i = 0; i <= buffer.length - pattern.length; i++) {
+            boolean found = true;
+            for (int j = 0; j < pattern.length; j++) {
+                if (buffer[i + j] != pattern[j]) {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) {
+//                print_to_terminal("Pattern found at position " + i + " in buffer of size " + buffer.length);
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Find the angle/battery response pattern in the buffer
+     * @param buffer The buffer to search in
+     * @return The starting position of the pattern, or -1 if not found
+     */
+    private int findAngleBatteryPattern(byte[] buffer) {
+        // Pattern to search for: A0 04 FF 00 03
+        byte[] pattern = {(byte) 0xA0, (byte) 0x04, (byte) 0xFF, (byte) 0x00, (byte) 0x03};
+        
+        for (int i = 0; i <= buffer.length - pattern.length; i++) {
+            boolean found = true;
+            for (int j = 0; j < pattern.length; j++) {
+                if (buffer[i + j] != pattern[j]) {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) {
+//                print_to_terminal("Angle/Battery pattern found at position " + i + " in buffer of size " + buffer.length);
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Process BLE packet using pattern-based detection
+     * @param patternStart The starting position of the pattern
+     * @return true if packet was processed, false if incomplete
+     */
+    private boolean processBlePacketWithPattern(int patternStart) {
+        int packetStart = patternStart - 22;
+        int packetEnd = patternStart + 252;
+        
+        // Check if we have enough data for the complete packet
+        if (packetStart < 0 || packetEnd > packetBuffer.length) {
+//            print_to_terminal("Incomplete packet - need positions " + packetStart + " to " + packetEnd +
+//                            ", have buffer size " + packetBuffer.length);
+            return false; // Keep in buffer, need more data
+        }
+        
+        // Extract the complete packet
+        byte[] packetData = Arrays.copyOfRange(packetBuffer, packetStart, packetEnd);
+        
+        // Debug: Show the extracted packet data
+//        print_to_terminal("Extracted packet - Pattern at " + patternStart +
+//                         ", Packet range: " + packetStart + " to " + packetEnd +
+//                         ", Packet: " + bytesToHex(Arrays.copyOfRange(packetData, 0, packetData.length)));
+        
+        // Try to parse as BLE packet
+        BlePacket packet = BlePacket.parsePacket(packetData);
+        if (packet != null && !packet.isComplete()) {
+//            print_to_terminal("packet incomplete, packet length = " + packet.getDataLen());
+        }
+        if (packet != null && packet.isComplete()) {
+//            print_to_terminal("Packet appeared to parse successfully");
+            // Complete packet found - queue Firebase operation
+            final BlePacket finalPacket = packet;
+            queueForProcessing(() -> {
+                FirebaseService.Companion.getServiceInstance().appendFile(finalPacket.toCSV());
+            });
+            
+            // Remove the processed packet from buffer
+            removeFromBuffer(packetEnd);
+            blePacketsProcessed++; // Increment counter
+            
+            // Choose output format based on setting
+            String packetString;
+            if (useDetailedPacketOutput) {
+                // Truncate packet data for display like the old system
+                packetString = packet.toString();
+                if (truncate) {
+                    int length = packetString.length();
+                    int lastNewline = packetString.lastIndexOf('\n');
+                    if (lastNewline >= 0 && length > lastNewline + 40) {
+                        length = lastNewline + 40;
+                    }
+                    packetString = packetString.substring(0, length) + "…";
+                }
+            } else {
+                // Use simplified format
+                packetString = packet.toSimpleString();
+            }
+            
+            print_to_terminal(packetString, Color.MAGENTA);
+//            print_to_terminal("BLE packet processed successfully - Pattern at " + patternStart +
+//                            ", Packet size: " + packetData.length + " bytes" +
+//                            ", Total BLE packets: " + blePacketsProcessed);
+            return true;
+        } else if (packet != null) {
+            // Partial packet - keep it in buffer
+            pendingPacket = packet;
+//            print_to_terminal("Partial BLE packet - waiting for more data");
+            return false;
+        } else {
+            // Can't parse - might be incomplete, keep in buffer
+            pendingBytes = packetData.clone();
+//            print_to_terminal("BLE packet parse failed - keeping in buffer");
+            return false;
+        }
+    }
+
+    /**
+     * Process angle/battery response using pattern-based detection
+     * @param patternStart The starting position of the pattern
+     * @return true if packet was processed, false if incomplete
+     */
+    private boolean processAngleBatteryResponseWithPattern(int patternStart) {
+        // Extract 8-byte sequence starting at pattern position
+        int packetStart = patternStart;
+        int packetEnd = patternStart + 8;
+        
+        // Check if we have enough data for the complete packet
+        if (packetEnd > packetBuffer.length) {
+//            print_to_terminal("Incomplete angle/battery packet - need positions " + packetStart + " to " + packetEnd +
+//                            ", have buffer size " + packetBuffer.length);
+            return false; // Keep in buffer, need more data
+        }
+        
+        // Extract the complete packet
+        byte[] packetData = Arrays.copyOfRange(packetBuffer, packetStart, packetEnd);
+        
+        // Debug: Show the extracted packet data
+        //        print_to_terminal("Extracted angle/battery packet - Pattern at " + patternStart +
+        //                         ", Packet range: " + packetStart + " to " + packetEnd +
+        //                         ", Full packet: " + bytesToHex(packetData));
+        
+        // Process the angle/battery data
+        processAngleBatteryData(packetData);
+        
+        // Remove only the specific 8-byte packet from buffer
+        removeSpecificRangeFromBuffer(packetStart, packetEnd);
+        angleBatteryPacketsProcessed++; // Increment counter
+        //        print_to_terminal("Angle/Battery packet processed successfully - Pattern at " + patternStart +
+        //                         ", Packet size: " + packetData.length + " bytes");
+//        print_to_terminal("Angle/Battery packet processed - Total: " + angleBatteryPacketsProcessed);
+        return true;
+    }
+
+    private boolean processAngleBatteryResponse() {
+        // Angle/battery responses should be complete
+        if (packetBuffer.length >= 15) { // Minimum size for angle/battery response
+            processAngleBatteryData(packetBuffer);
+            removeFromBuffer(packetBuffer.length);
+//            print_to_terminal("Angle/Battery packet processed - Size: " + packetBuffer.length);
+            return true;
+        }
+//        print_to_terminal("Angle/Battery packet too small - Size: " + packetBuffer.length + " (need >= 15)");
+        return false; // Keep in buffer if incomplete
+    }
+
+    private boolean processTemperatureResponse() {
+        // Temperature responses should be complete
+        if (packetBuffer.length >= 9) {
+            final int temp = packetBuffer[packetBuffer.length - 2];
+            queueForProcessing(() -> {
+                FirebaseService.Companion.getServiceInstance().appendTemp(temp);
+            });
+            removeFromBuffer(packetBuffer.length);
+            temperaturePacketsProcessed++; // Increment counter
+            print_to_terminal("Temperature packet processed - Size: " + packetBuffer.length + ", Temp: " + temp + ", Total: " + temperaturePacketsProcessed);
+            return true;
+        }
+//        print_to_terminal("Temperature packet too small - Size: " + packetBuffer.length + " (need >= 9)");
+        return false;
+    }
+
+    private boolean processKnownResponse() {
+        // Known responses should be complete
+        Object[] result = BGapi.getResponseNameAndPosition(packetBuffer);
+        if (result != null) {
+            String responseName = (String) result[0];
+            int position = (Integer) result[1];
+            byte[] responsePattern = BGapi.getKnownResponses().get(responseName);
+            
+            if (responsePattern != null) {
+                // Extract the specific response pattern from the buffer
+                int responseStart = position;
+                int responseEnd = position + responsePattern.length;
+                
+                // Remove only the specific response from buffer
+                removeSpecificRangeFromBuffer(responseStart, responseEnd);
+                
+                handleKnownResponse(responseName);
+                knownResponsesProcessed++; // Increment counter
+//                print_to_terminal("Known response processed: " + responseName + " at position " + position + ", Total: " + knownResponsesProcessed);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean findAndProcessKnownPattern() {
+        // Look for known response patterns within the buffer
+        // For now, we'll keep the original logic for unknown data
+        // This could be enhanced later to search for known patterns
+        
+        // Debug: Print comprehensive buffer info when no packet type is recognized
+//        String debugInfo = "No packet type recognized - Buffer size: " + packetBuffer.length +
+//                          ", Full buffer: " + bytesToHex(packetBuffer);
+//        print_to_terminal(debugInfo);
+        
+        return false; // Keep in buffer if we can't identify it
+    }
+
+    private void processAngleBatteryData(byte[] data) {
+        if (data[data.length - 1] == (byte) 0xFF) {
+            // Angle data
+            byte[] lastTwoBytes = new byte[2];
+            System.arraycopy(data, data.length - 3, lastTwoBytes, 0, 2);
+            
+            int pot_bits = ((lastTwoBytes[0] & 0xFF) << 4) | ((lastTwoBytes[1] & 0xF0) >>> 4);
+            float pot_voltage = (float) (pot_bits * 0.002);
+            potAngle = (float) (((pot_voltage - 0.332) / (2.7 - 0.332)) * 360);
+            
+            Boolean isMoving = angleMeasSeries.addMeasurementFiltered(potAngle);
+            if (isMoving && !shouldbeMoving) {
+                try {
+                    write(TextUtil.fromHexString(BGapi.ROTATE_STOP));
+                    System.out.println("Stopped Erroneous Rotation");
+                } catch (IOException e) {
+                    Log.e("SerialService", "Error stopping motor", e);
+                }
+            }
+            
+            lastHeadingTime = LocalDateTime.now();
+            send_heading_intent();
+            
+        } else if (data[data.length - 1] == (byte) 0xF0) {
+            // Battery data
+            byte[] lastTwoBytes = new byte[2];
+            System.arraycopy(data, data.length - 3, lastTwoBytes, 0, 2);
+            
+            int batt_bits = ((lastTwoBytes[0] & 0xFF) << 4) | ((lastTwoBytes[1] & 0xF0) >>> 4);
+            float batt_voltage = ((float) (batt_bits * 0.002)) * 6;
+            
+            lastBatteryVoltage = batt_voltage;
+            System.out.print("Battery voltage was " + batt_voltage + "\n");
+        } else {
+            Log.w("SerialService", "Unknown angle/battery response flag: " + data[data.length - 1]);
+        }
+    }
+
+    private void handleKnownResponse(String responseName) {
+        if ("message_system_boot".equals(responseName)) {
+            try {
+                write(TextUtil.fromHexString(BGapi.SCANNER_START));
+            } catch (Exception e) {
+                Log.e("SerialService", "Error restarting scanner", e);
+            }
+        } else if ("message_rotate_ccw_rsp".equals(responseName)) {
+            if (lastCommand == null || !lastCommand.equals(BGapi.ROTATE_CCW)) {
+                if (lastEventTime < 0) {
+                    lastEventTime = System.currentTimeMillis();
+                    Log.w("SerialService", "Unexpected " + responseName + " received for the first time");
+//                } else {
+                    long timeElapsed = System.currentTimeMillis() - lastEventTime;
+                    lastEventTime = System.currentTimeMillis();
+                    Log.w("SerialService", "Unexpected " + responseName + " received after " + timeElapsed/1000 + " seconds");
+                }
+                try {
+                    write(TextUtil.fromHexString(BGapi.ROTATE_STOP));
+                } catch (IOException e) {
+                    Log.e("SerialService", "Error stopping motor", e);
+                }
+            }
+        }
+    }
+
+    private void removeFromBuffer(int length) {
+        if (length >= packetBuffer.length) {
+            packetBuffer = new byte[0];
+        } else {
+            packetBuffer = Arrays.copyOfRange(packetBuffer, length, packetBuffer.length);
+        }
+    }
+
+    /**
+     * Remove a specific range of bytes from the buffer
+     * @param start Start position (inclusive)
+     * @param end End position (exclusive)
+     */
+    private void removeSpecificRangeFromBuffer(int start, int end) {
+        if (start < 0 || end > packetBuffer.length || start >= end) {
+            print_to_terminal("Invalid range for buffer removal: " + start + " to " + end + " (buffer size: " + packetBuffer.length + ")");
+            return;
+        }
+        
+        // Create new buffer with the range removed
+        byte[] newBuffer = new byte[packetBuffer.length - (end - start)];
+        
+        // Copy bytes before the range
+        System.arraycopy(packetBuffer, 0, newBuffer, 0, start);
+        
+        // Copy bytes after the range
+        System.arraycopy(packetBuffer, end, newBuffer, start, packetBuffer.length - end);
+        
+        packetBuffer = newBuffer;
+        
+//        print_to_terminal("Removed bytes " + start + " to " + end + " from buffer. New size: " + packetBuffer.length);
+    }
+
+    /**
      * Given two byte arrays a,b, returns a new byte array that has appended b to the end of a
      **/
     private byte[] appendByteArray(byte[] a, byte[] b) {
@@ -959,6 +1265,17 @@ public class SerialService extends Service implements SerialListener {
         System.arraycopy(a, 0, temp, 0, a.length);
         System.arraycopy(b, 0, temp, a.length, b.length);
         return temp;
+    }
+
+    /**
+     * Convert byte array to hex string for debugging
+     */
+    private String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02X ", b));
+        }
+        return sb.toString().trim();
     }
 
     public void onSerialIoError(Exception e) {
@@ -997,10 +1314,9 @@ public class SerialService extends Service implements SerialListener {
         public void onReceive(Context context, Intent intent) {
             if (intent != null && intent.getAction() != null) {
                 if (intent.getAction().equals(KEY_STOP_MOTOR_ACTION)) {
-                    //check if autorotate is selected in UI
                     isMotorRunning = intent.getBooleanExtra(KEY_MOTOR_SWITCH_STATE, false);
                     if (isMotorRunning) {
-                        SerialService.getInstance().startMotorHandler();
+                        SerialService.getInstance().startRotationHandler();
                     }
                 } else if (intent.getAction().equals(KEY_HEADING_RANGE_ACTION)) {
                     float[] headingLimits = intent.getFloatArrayExtra(KEY_HEADING_RANGE_STATE);
@@ -1015,4 +1331,30 @@ public class SerialService extends Service implements SerialListener {
         }
     }
 
+    /**
+     * Queue an operation for ordered processing
+     */
+    private void queueForProcessing(Runnable operation) {
+        synchronized (processingLock) {
+            processingQueue.offer(operation);
+        }
+        // Process the queue on the main thread to ensure ordering
+        mainLooper.post(this::processQueuedOperations);
+    }
+
+    /**
+     * Process all queued operations in order
+     */
+    private void processQueuedOperations() {
+        synchronized (processingLock) {
+            while (!processingQueue.isEmpty()) {
+                Runnable operation = processingQueue.poll();
+                if (operation != null) {
+                    operation.run();
+                }
+            }
+        }
+    }
+
 }
+

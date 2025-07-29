@@ -37,7 +37,7 @@ class FirebaseService : Service() {
     private var handler: Handler? = null
     private lateinit var timeoutRunnable: Runnable
     // How long, in ms, we should wait in between uploading the log
-    private val uploadDelay = 10.minutes.inWholeMilliseconds
+    private val uploadDelay = 5.minutes.inWholeMilliseconds
 
     private var logFw: FileWriter? = null
     private var logFile: File? = null
@@ -68,16 +68,26 @@ class FirebaseService : Service() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        Log.i(TAG, "Firebase Service onCreate()")
 
-        val path = applicationContext.getExternalFilesDir(null)
-        logFile = File(path,getDateTime() + "_log.txt")
-        logFw = FileWriter(logFile)
+        try {
+            val path = applicationContext.getExternalFilesDir(null)
+            if (path != null) {
+                logFile = File(path, getDateTime() + "_log.txt")
+                logFw = FileWriter(logFile)
 
-        temperatureFile = File(path,getDateTime() + "_templog.txt")
-        temperatureFw = FileWriter(temperatureFile)
+                temperatureFile = File(path, getDateTime() + "_templog.txt")
+                temperatureFw = FileWriter(temperatureFile)
 
-        headingFile = File(path,getDateTime() + "_headings.txt")
-        headingFw = FileWriter(headingFile)
+                headingFile = File(path, getDateTime() + "_headings.txt")
+                headingFw = FileWriter(headingFile)
+                headingFw!!.write("datetime,pot_angle,latitude,longitude,accel_x,accel_y,accel_z,mag_x,mag_y,mag_z,gyro_x,gyro_y,gyro_z,heading_min,heading_max,treat_min_as_max,old_heading,rotation_state\n")
+            } else {
+                Log.e(TAG, "External files directory is null")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error creating file writers in onCreate", e)
+        }
     }
 
     /**
@@ -123,6 +133,7 @@ class FirebaseService : Service() {
             handler = Handler(looper!!)
 
             timeoutRunnable = Runnable {
+                System.out.println("About to upload log")
                 uploadLog()
 //                Toast.makeText(applicationContext, "Handler fired", Toast.LENGTH_SHORT).show();
                 //after uploadDelay milliseconds, run the code inside timeoutRunnable again
@@ -182,9 +193,11 @@ class FirebaseService : Service() {
         fileRef.putFile(uri)
             .addOnSuccessListener {
                 Toast.makeText(applicationContext, "Upload Success $dir", Toast.LENGTH_SHORT).show()
+                Log.i(TAG,"Upload success for $fileRef")
             }
             .addOnFailureListener {
 //                Toast.makeText(applicationContext, it.message, Toast.LENGTH_SHORT).show()
+                Log.i(TAG,"Upload failure for $fileRef")
             }
     }
 
@@ -236,27 +249,36 @@ class FirebaseService : Service() {
      * Note that files use the timestamp of when they were created, not when they were uploaded
      * */
     fun uploadLog() {
+        Log.i(TAG, "upload log called")
         synchronized(this) {
-            //close the FileWriter
-            logFw?.close()
-            //upload the log
-            // the ?.let syntax is Kotlin shorthand for a null check
-            logFile?.let { uploadFile(it, "log") }
-            //create new File + FileWriter
-            val path = applicationContext.getExternalFilesDir(null)
-            logFile = File(path,getDateTime() + "_log.txt")
-            logFw = FileWriter(logFile)
+            try {
+                //close the FileWriter
+                logFw?.close()
+                //upload the log
+                // the ?.let syntax is Kotlin shorthand for a null check
+                logFile?.let { uploadFile(it, "log") }
+                //create new File + FileWriter
+                val path = applicationContext.getExternalFilesDir(null)
+                if (path != null) {
+                    logFile = File(path, getDateTime() + "_log.txt")
+                    logFw = FileWriter(logFile)
 
-            temperatureFw?.close()
-            temperatureFile?.let { uploadFile(it, "geckoTemp") }
-            temperatureFile = File(path, getDateTime() + "_templog.txt")
-            temperatureFw = FileWriter(temperatureFile)
+                    temperatureFw?.close()
+                    temperatureFile?.let { uploadFile(it, "geckoTemp") }
+                    temperatureFile = File(path, getDateTime() + "_templog.txt")
+                    temperatureFw = FileWriter(temperatureFile)
 
-            headingFw?.close()
-            headingFile?.let { uploadFile(it, "headings") }
-            headingFile = File(path, getDateTime() + "_headings.txt")
-            headingFw = FileWriter(headingFile)
-            headingFw!!.write("datetime,headingCurrent,headingMin,headingMax,headingMinAsMax,headingOld\n")
+                    headingFw?.close()
+                    headingFile?.let { uploadFile(it, "headings") }
+                    headingFile = File(path, getDateTime() + "_headings.txt")
+                    headingFw = FileWriter(headingFile)
+                    headingFw!!.write("datetime,pot_angle,latitude,longitude,accel_x,accel_y,accel_z,mag_x,mag_y,mag_z,gyro_x,gyro_y,gyro_z,heading_min,heading_max,treat_min_as_max,old_heading,rotation_state\n")
+                } else {
+                    Log.e(TAG, "External files directory is null during upload")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during uploadLog", e)
+            }
         }
     }
 
@@ -266,15 +288,27 @@ class FirebaseService : Service() {
         }
     }
 
-    fun appendHeading(
-            heading: Double,
-            headingMin: Double,
-            headingMax: Double,
-            treatHeadingMinAsMax: Boolean,
-            state: String
-    ) {
+//    fun appendHeading(
+//            potHeading: Double,
+//            magHeading: FloatArray,
+//            headingMin: Double,
+//            headingMax: Double,
+//            treatHeadingMinAsMax: Boolean,
+//            oldHeading: Double,
+//            state: String
+//    ) {
+//        synchronized(this) {
+//            headingFw?.write("${getDateTime()},$potHeading, ${magHeading.joinToString(",")}, $headingMin,$headingMax,$treatHeadingMinAsMax,$oldHeading,$state\n")
+//        }
+//    }
+
+    fun appendHeading(csv: String) {
         synchronized(this) {
-            headingFw?.write("${getDateTime()},$heading,$headingMin,$headingMax,$treatHeadingMinAsMax,$state\n")
+            try {
+                headingFw?.write(csv)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error writing to heading file", e)
+            }
         }
     }
 

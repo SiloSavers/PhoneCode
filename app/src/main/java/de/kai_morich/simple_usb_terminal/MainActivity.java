@@ -1,25 +1,18 @@
 package de.kai_morich.simple_usb_terminal;
 
-import static java.util.concurrent.TimeUnit.MINUTES;
-
 import android.Manifest;
 import android.annotation.SuppressLint;
-import android.app.AlertDialog;
-import android.content.DialogInterface;
+import android.app.admin.DevicePolicyManager;
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
-import android.location.Location;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.PowerManager;
-import android.os.StrictMode;
 import android.provider.Settings;
-import android.text.InputType;
 import android.view.Menu;
 import android.view.MenuInflater;
-import android.view.MenuItem;
 import android.view.WindowManager;
-import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -29,26 +22,42 @@ import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.FragmentManager;
-import androidx.work.PeriodicWorkRequest;
 
-import com.google.android.gms.location.CurrentLocationRequest;
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.location.Priority;
-import com.google.android.gms.tasks.CancellationToken;
-import com.google.android.gms.tasks.OnTokenCanceledListener;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
 import java.io.File;
-import java.util.Timer;
-import java.util.TimerTask;
+
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
+import android.os.UserManager;
+
 
 @RequiresApi(api = Build.VERSION_CODES.O)
 public class MainActivity extends AppCompatActivity implements FragmentManager.OnBackStackChangedListener {
 
     private StorageReference storageRef;
     private LocationHelper locationHelper;
+
+    private final BroadcastReceiver unlockReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (Intent.ACTION_USER_UNLOCKED.equals(intent.getAction())) {
+                unregisterReceiver(this);
+                initializeAfterUnlock();
+            }
+        }
+    };
+
+    DevicePolicyManager mDPM;
+
+    MyDeviceAdminReceiver deviceAdminReceiver;
+
+    //used to identify the device admin receiver in the permission request intent (?)
+    ComponentName mDeviceAdminReceiver;
+
+    private FirebaseAuth mAuth;
 
     ActivityResultLauncher<String[]> locationPermissionRequest =
             registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
@@ -73,29 +82,55 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        //helps with debugging "Resource Failed to Close" log message (which turned out to be too arcane to be worth worrying about)
-        // see https://stackoverflow.com/questions/66620246/a-resource-failed-to-call-close
-//        StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder(StrictMode.getVmPolicy())
-//                .detectLeakedClosableObjects()
-//                .build());
-
         //following line will keep the screen active
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
 
-        // creates a ui element toolbar and sets the action
+        UserManager userManager = (UserManager) getSystemService(Context.USER_SERVICE);
+        if (userManager.isUserUnlocked()) {
+            initializeAfterUnlock();
+        } else {
+            IntentFilter filter = new IntentFilter(Intent.ACTION_USER_UNLOCKED);
+            registerReceiver(unlockReceiver, filter);
+        }
+
+        //setup toolbar
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-
-        // adds listener for when you press the back button and it needs to decide where to go
         getSupportFragmentManager().addOnBackStackChangedListener(this);
 
-        // starts service to inteface with magnetometer and accelerometer
-        startService(new Intent(this, SensorHelper.class));
 
-        // starts processes for firebase uploading and starting serial service
-        WorkerWrapper.startFirebaseWorker(getApplicationContext());
+
+        //stop firebase worker (from testing)
+//        WorkerWrapper.checkWorkerStatus(getApplicationContext());
+//        WorkerWrapper.stopFireBaseWorker(getApplicationContext());
+//        WorkerWrapper.checkWorkerStatus(getApplicationContext());
+
+
+//        WorkerWrapper.startFirebaseWorker(getApplicationContext());
         WorkerWrapper.startSerialWorker(getApplicationContext());
+
+
+
+        //initialize Device Policy Manager (used for periodic restarts)
+        mDPM = (DevicePolicyManager) getSystemService(Context.DEVICE_POLICY_SERVICE);
+        mDeviceAdminReceiver = new ComponentName(this, MyDeviceAdminReceiver.class);
+
+        System.out.println("Package name: " + this.getPackageName());
+
+        //next steps: create a button or something in device fragment (or terminal fragment)
+        //that triggers the request permissions activity for device administrator priveleges
+
+//        if(mDPM.isDeviceOwnerApp(this.getPackageName())) {
+//            System.out.println("mDPM is successful device administrator");
+//        }
+
+
+        Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
+        intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, mDeviceAdminReceiver);
+        intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                "Some extra text explaining why we're asking for device admin permission");
+        startActivity(intent);
+
 
 
         locationPermissionRequest.launch(new String[]{
@@ -103,14 +138,12 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
                 Manifest.permission.ACCESS_COARSE_LOCATION
         });
 
-        // passes gps location around to where it is needed
-       locationHelper = new LocationHelper(this);
-       locationHelper.startLocationUpdates();
+
+
 
         FirebaseStorage storage = FirebaseStorage.getInstance();
         storageRef = storage.getReference();
 
-        //Create new device fragment if one doesn't exist
         if (savedInstanceState == null)
             getSupportFragmentManager().beginTransaction().add(R.id.fragment, new DevicesFragment(), "devices").commit();
         else
@@ -205,15 +238,32 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
     protected void onNewIntent(Intent intent) {
         if ("android.hardware.usb.action.USB_DEVICE_ATTACHED".equals(intent.getAction())) {
             TerminalFragment terminal = (TerminalFragment) getSupportFragmentManager().findFragmentByTag("terminal");
-            if (terminal != null)
+            if (terminal != null) {
                 terminal.status("USB device detected");
+                terminal.connect();
+                //this might be the problem
+            }
         }
         super.onNewIntent(intent);
     }
 
+    private void initializeAfterUnlock() {
+        // Firebase Auth
+        mAuth = FirebaseAuth.getInstance();
+
+        // Start GPS/heading service
+        startService(new Intent(this, SensorHelper.class));
+
+        // Start Firebase service
+        startService(new Intent(this, FirebaseService.class));
+
+        // Location tracking
+        locationHelper = new LocationHelper(this);
+        locationHelper.startLocationUpdates();
+    }
+
     @Override
     public void onDestroy(){
-        //todo: why are these commented out?
 //        stopService(new Intent(this, FirebaseService.class));
 //        stopService(new Intent(this, SerialService.class));
         super.onDestroy();
@@ -223,6 +273,9 @@ public class MainActivity extends AppCompatActivity implements FragmentManager.O
         locationHelper.changePriority(priority);
     }
 
+    public void updateLocationInterval(long intervalSeconds){
+        locationHelper.changeUpdateInterval(intervalSeconds);
+    }
 
     public void uploadFile(File file) {
         Uri uri = Uri.fromFile(file);

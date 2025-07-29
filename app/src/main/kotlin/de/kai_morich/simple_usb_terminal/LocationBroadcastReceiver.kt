@@ -19,7 +19,10 @@ class LocationBroadcastReceiver: BroadcastReceiver() {
     }
 
     companion object {
+        @JvmField
         var currentLocation: Location? = null
+        fun getCurrentLocation(): Location? = currentLocation
         const val ACTION_PROCESS_UPDATES = "de.kai_morich.simple_usb_terminal.LocationBroadcastReceiver.ACTION_PROCESS_UPDATES"
     }
+
 }

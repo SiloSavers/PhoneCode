@@ -19,7 +19,6 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
-import android.os.SystemClock;
 import android.text.InputType;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
@@ -38,6 +37,7 @@ import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -53,6 +53,7 @@ import com.hoho.android.usbserial.driver.UsbSerialDriver;
 import com.hoho.android.usbserial.driver.UsbSerialPort;
 import com.hoho.android.usbserial.driver.UsbSerialProber;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
@@ -103,6 +104,17 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private SerialService service;
 
     private TextView receiveText;
+
+    private CircularProgressIndicator circularProgress;
+
+    private TextView angleDisplayText;
+
+    private TextView batteryDisplayText;
+    private TextView rotationStateDisplayText;
+
+    private TextView rotationMinDisplay;
+
+    private TextView rotationMaxDisplay;
     private RangeSlider headingSlider;
     private BlePacket pendingPacket;
 
@@ -110,13 +122,10 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private boolean initialStart = true;
     private boolean truncate = true;
     private int rotatePeriod = 500;
-    public static int logLevel = 10; // this is the default log level
 
     private SharedPreferences sharedPref;
 
     private static TerminalFragment instance;
-
-
 
     public static TerminalFragment getInstance(){
         return instance;
@@ -135,19 +144,59 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         instance = this;
     }
 
-    public static final String RECEIVE_HEADING_STATS = "TerminalFragment.RECEIVE_HEADING_STATE";
-    public static final String RECEIVE_HEADING_EXTRA = "TerminalFragment.HEADING_EXTRA";
+    public static final String RECEIVE_HEADING_STATE = "TerminalFragment.RECEIVE_HEADING_STATE";
+    public static final String RECEIVE_ROTATION_STATE = "TerminalFragment.RECEIVE_ROTATION_STATE";
+
+    public static final String RECEIVE_BATTERY_VOLTAGE = "TerminalFragment.RECEIVE_BATTERY_VOLTAGE";
+
+    public static final String BATTERY_VOLTAGE = "TerminalFragment.BATTERY_VOLTAGE";
+    public static final String RECEIVE_ANGLE = "TerminalFragment.RECEIVE_ANGLE";
+    public static final String GENERAL_PURPOSE_PRINT = "TerminalFragment.GENERAL_PURPOSE_PRINT";
+
+    public static final String GENERAL_PURPOSE_STRING = "TerminalFragment.GENERAL_PURPOSE_STRING";
+    public static final String GENERAL_PURPOSE_PRINT_COLORED = "TerminalFragment.GENERAL_PURPOSE_PRINT_COLORED";
+    public static final String GENERAL_PURPOSE_COLOR = "TerminalFragment.GENERAL_PURPOSE_COLOR";
+
     private LocalBroadcastManager bManager;
 
-    private BroadcastReceiver headingReceiver = new BroadcastReceiver() {
+    private BroadcastReceiver terminalReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (intent.getAction().equals(RECEIVE_HEADING_STATS)){
-                String s = intent.getExtras().getString(RECEIVE_HEADING_EXTRA);
-                //system.out.println calls print to Log.info apparently, neat
-//                System.out.println("heading received: "+s);
-                if(receiveText != null){
-                    MyLogger.log_v(receiveText, s);
+            String s = null;
+            Integer color = null;
+//            System.out.println(intent.getAction());
+            if (intent.getAction().equals(RECEIVE_HEADING_STATE)){
+                String state = intent.getStringExtra(RECEIVE_ROTATION_STATE);
+                double angle = intent.getFloatExtra(RECEIVE_ANGLE, 0); //todo: why does 0.0 not work here?
+                String formattedAngle = "Angle: " + String.format("%-7.1f", angle);
+                angleDisplayText.setText(formattedAngle);
+                rotationStateDisplayText.setText(state);
+//                System.out.println("heading received: "+ angle);
+            } else if (intent.getAction().equals(RECEIVE_BATTERY_VOLTAGE))  {
+                System.out.println("receive battery voltage intent");
+                double voltage = intent.getFloatExtra(BATTERY_VOLTAGE, 0);
+                String formattedVoltage = "Batt Voltage: " + String.format("%-7.1f", voltage);
+                batteryDisplayText.setText(formattedVoltage);
+            }
+            else if (intent.getAction().equals(GENERAL_PURPOSE_PRINT)) {
+                s = intent.getExtras().getString(GENERAL_PURPOSE_STRING);
+                System.out.println(s);
+            }
+            else if (intent.getAction().equals(GENERAL_PURPOSE_PRINT_COLORED)) {
+                s = intent.getExtras().getString(GENERAL_PURPOSE_STRING);
+                color = intent.getExtras().getInt(GENERAL_PURPOSE_COLOR);
+                System.out.println(s);
+            }
+
+            if(receiveText != null && s != null){
+                if (color != null) {
+                    // Apply color formatting
+                    SpannableStringBuilder spn = new SpannableStringBuilder(s + "\n");
+                    spn.setSpan(new ForegroundColorSpan(color), 0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    receiveText.append(spn);
+                } else {
+                    // Default formatting
+                    receiveText.append(s + "\n");
                 }
             }
         }
@@ -168,14 +217,13 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         deviceId = getArguments().getInt("device");
         portNum = getArguments().getInt("port");
         baudRate = getArguments().getInt("baud");
-        SensorHelper.setHeading(0);
-
-        MyLogger.setLogLevel(logLevel);
 
         bManager = LocalBroadcastManager.getInstance(getActivity().getApplicationContext());
         IntentFilter filter = new IntentFilter();
-        filter.addAction(RECEIVE_HEADING_STATS);
-        bManager.registerReceiver(headingReceiver, filter);
+        filter.addAction(RECEIVE_HEADING_STATE);
+        filter.addAction(GENERAL_PURPOSE_PRINT);
+        filter.addAction(GENERAL_PURPOSE_PRINT_COLORED);
+        bManager.registerReceiver(terminalReceiver, filter);
     }
 
     /**
@@ -186,7 +234,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         if (connected != Connected.False)
             disconnect();
         getActivity().stopService(new Intent(getActivity(), SerialService.class));
-        bManager.unregisterReceiver(headingReceiver);
+        bManager.unregisterReceiver(terminalReceiver);
         super.onDestroy();
     }
 
@@ -195,11 +243,11 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
      * */
     @Override
     public void onStart() {
+        System.out.println("Terminal Fragment onStart() called");
+
         super.onStart();
-        if (service != null)
-            service.attach(this);
-        else
-            getActivity().startService(new Intent(getActivity(), SerialService.class)); // prevents service destroy on unbind from recreated activity caused by orientation change
+        getActivity().bindService(new Intent(getActivity(), SerialService.class), this, Context.BIND_AUTO_CREATE);
+
     }
 
     /**
@@ -228,7 +276,19 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onAttach(@NonNull Activity activity) {
         super.onAttach(activity);
-        getActivity().bindService(new Intent(getActivity(), SerialService.class), this, Context.BIND_AUTO_CREATE);
+
+
+        if (service != null) {
+            try {
+                service.attach(this);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        else
+            //if startService is called before bind(), then the service lives indefinitely
+            getActivity().startService(new Intent(getActivity(), SerialService.class)); // prevents service destroy on unbind from recreated activity caused by orientation change
+
     }
 
     @Override
@@ -259,15 +319,21 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     @Override
     public void onServiceConnected(ComponentName name, IBinder binder) {
         service = ((SerialService.SerialBinder) binder).getService();
-        service.attach(this);
+        try {
+            service.attach(this);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         if (initialStart && isResumed()) {
             initialStart = false;
             getActivity().runOnUiThread(this::connect);
         }
     }
 
+
     @Override
     public void onServiceDisconnected(ComponentName name) {
+        FirebaseService.Companion.getServiceInstance().appendFile("Serial Service Disconnected\n"); //todo: check that this works somehow
         service = null;
     }
 
@@ -278,22 +344,37 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         receiveText.setTextColor(getResources().getColor(R.color.colorRecieveText)); // set as default color to reduce number of spans
         receiveText.setMovementMethod(ScrollingMovementMethod.getInstance());
 
-
-        //setup the 'setup' button
         View setupBtn = view.findViewById(R.id.setup_btn);
         setupBtn.setOnClickListener(this::onSetupClicked);
 
-        //setup the stop upload button
+        //setup angle display view
+        angleDisplayText = view.findViewById(R.id.DisplayAngle);
+        angleDisplayText.setText("Rotator Angle:");
+
+        batteryDisplayText = view.findViewById(R.id.batteryVoltage);
+        batteryDisplayText.setText("Batt Voltage:");
+
+        //setup rotation state display view
+        rotationStateDisplayText = view.findViewById(R.id.RotationStateDisplay);
+        rotationStateDisplayText.setText("rotation State: ");
+
+        circularProgress = view.findViewById(R.id.circularProgress);
+
+        //start point is
+
+        circularProgress.setRotation(195f);
+        circularProgress.setProgress(90);
+
+
         View stopUploadBtn = view.findViewById(R.id.stop_upload_btn);
         stopUploadBtn.setOnClickListener(btn -> {
-            Toast.makeText(getContext(), "Upload Stop Button Pressed!", Toast.LENGTH_LONG).show();
+            Toast.makeText(getContext(), "click!", Toast.LENGTH_SHORT).show();
             Intent stopIntent = new Intent(getContext(), FirebaseService.ActionListener.class);
             stopIntent.setAction(FirebaseService.KEY_NOTIFICATION_STOP_ACTION);
             stopIntent.putExtra(FirebaseService.KEY_NOTIFICATION_ID, ServiceNotification.notificationId);
             FirebaseService.Companion.getInstance().sendBroadcast(stopIntent);
         });
 
-        //setup the stop motor button
         SwitchCompat stopMotorBtn = view.findViewById(R.id.stop_motor_btn);
         stopMotorBtn.setOnCheckedChangeListener((buttonView, isChecked) -> {
             Intent stopMotorIntent = new Intent(getContext(), SerialService.ActionListener.class);
@@ -302,30 +383,55 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             SerialService.getInstance().sendBroadcast(stopMotorIntent);
         });
 
-        //setup the heading slider
         headingSlider = view.findViewById(R.id.slider);
         //load the min/max from local storage
         sharedPref = getContext().getSharedPreferences(PREFERENCE_FILE, Context.MODE_PRIVATE);
         float headingMin = sharedPref.getFloat("heading_min", /*default*/20.0f);
         float headingMax = sharedPref.getFloat("heading_max", /*default*/270.0f);
+        circularProgress.setRotation( 180f + headingMin);
+        circularProgress.setProgress((int) ((headingMax - headingMin)/3.6f));
+
+        //load the min/max from the slider at start
+//        float headingMin = 20.0f;
+//        float headingMax = 270.0f;
         Log.d("TerminalFragment", "Loaded min/max: "+headingMin+", "+headingMax);
         headingSlider.setValues(Arrays.asList(headingMin, headingMax));
         headingSlider.addOnChangeListener((rangeSlider, value, fromUser) -> {
             Activity activity = getActivity();
-
-            //setup broadcasting the values from the headings slider to any broadcastReciever
             if(activity instanceof MainActivity){
                 //broadcast the new values to SerialService
                 Intent headingRangeIntent = new Intent(getContext(), SerialService.ActionListener.class);
                 headingRangeIntent.setAction(SerialService.KEY_HEADING_RANGE_ACTION);
                 // turns out List.ToArray() can only return Object[], so use a custom method for float[]
                 float[] arr = listToArray(rangeSlider.getValues());
+
+                rotationMinDisplay.setText(new StringBuilder().append("Min: ").append(String.format("%.0f", arr[0])).toString());
+                rotationMaxDisplay.setText(new StringBuilder().append("Max: ").append(String.format("%.0f", arr[1])).toString());
+
+                circularProgress.setRotation( 180f + arr[0]);
+                circularProgress.setProgress((int) ((arr[1] - arr[0])/3.6f));
+
                 headingRangeIntent.putExtra(SerialService.KEY_HEADING_RANGE_STATE, arr);
                 SerialService.getInstance().sendBroadcast(headingRangeIntent);
             }
         });
 
-        //setup the toggle heading button
+        rotationMinDisplay = view.findViewById(R.id.RotationStateMin);
+        rotationMinDisplay.setText(new StringBuilder().append("Min: ").append(headingMin).toString());
+
+        rotationMaxDisplay = view.findViewById(R.id.RotationStateMax);
+        rotationMaxDisplay.setText(new StringBuilder().append("Max: ").append(headingMax).toString());
+
+        //broadcast the start values
+        Intent headingRangeIntent = new Intent(getContext(), SerialService.ActionListener.class);
+        headingRangeIntent.setAction(SerialService.KEY_HEADING_RANGE_ACTION);
+
+        float[] arr = {headingMin, headingMax};
+
+        headingRangeIntent.putExtra(SerialService.KEY_HEADING_RANGE_STATE, arr);
+        SerialService.getInstance().sendBroadcast(headingRangeIntent);
+
+
         SwitchCompat toggleHeadingBtn = view.findViewById(R.id.heading_range_toggle);
         toggleHeadingBtn.setOnCheckedChangeListener((buttonView, isChecked) -> {
             Activity activity = getActivity();
@@ -344,11 +450,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             }
         });
 
-        //setup start scan button
         View startBtn = view.findViewById(R.id.start_btn);
         startBtn.setOnClickListener(this::onStartClicked);
 
-        //setup stop scan button
         View stopBtn = view.findViewById(R.id.stop_btn);
         stopBtn.setOnClickListener(v -> send(BGapi.SCANNER_STOP));
 
@@ -383,7 +487,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         });
 
         //TODO switch to get the filename directly from FirebaseService
-        MyLogger.log_v(receiveText, "Writing to " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH_mm_ss")) + "_log.txt");
+        receiveText.append("Writing to " + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd_HH_mm_ss")) + "_log.txt" + "\n");
 
         return view;
     }
@@ -395,6 +499,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public void onCreateOptionsMenu(@NonNull Menu menu, MenuInflater inflater) {
         inflater.inflate(R.menu.menu_terminal, menu);
         menu.findItem(R.id.truncate).setChecked(truncate);
+        if (service != null) {
+            menu.findItem(R.id.detailedPacketOutput).setChecked(service.isUseDetailedPacketOutput());
+        }
     }
 
     @Override
@@ -406,21 +513,19 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         } else if (id == R.id.manualUpload) {
             FirebaseService.Companion.getInstance().uploadLog();
             return true;
-        } else if (id == R.id.logSelect) {
-            final String[] logLevels = getResources().getStringArray(R.array.log_levels);
-            int pos = java.util.Arrays.asList(logLevels).indexOf(String.valueOf(logLevel));
-            AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-            builder.setTitle("Log level");
-            builder.setSingleChoiceItems(logLevels, pos, (dialog, item1) -> {
-                logLevel = Integer.parseInt(logLevels[item1]);
-                MyLogger.setLogLevel(logLevel);
-                dialog.dismiss();
-            });
-            builder.create().show();
-            return true;
         } else if (id == R.id.truncate) {
             truncate = !truncate;
             item.setChecked(truncate);
+            return true;
+        } else if (id == R.id.detailedPacketOutput) {
+            if (service != null) {
+                boolean newState = !service.isUseDetailedPacketOutput();
+                service.setUseDetailedPacketOutput(newState);
+                item.setChecked(newState);
+                String status = newState ? "Detailed" : "Simplified";
+                Toast.makeText(getContext(), "Packet output: " + status, Toast.LENGTH_SHORT).show();
+                status("Packet output format: " + status);
+            }
             return true;
         } else if (id == R.id.manualCW) {
             send(BGapi.ROTATE_CW);
@@ -444,8 +549,80 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         } else if (id == R.id.getAngle) {
             send(BGapi.GET_ANGLE);
             return true;
-        }
-        else if (id == R.id.editRotate) {
+        } else if (id == R.id.showLogPath) {
+            if (service != null) {
+                String logPath = service.getLogFilePath();
+                if (logPath != null) {
+                    Toast.makeText(getContext(), "Log file: " + logPath, Toast.LENGTH_LONG).show();
+                    status("Log file path: " + logPath);
+                } else {
+                    Toast.makeText(getContext(), "Log file path not available", Toast.LENGTH_SHORT).show();
+                }
+            }
+            return true;
+        } else if (id == R.id.clearLog) {
+            if (service != null) {
+                service.clearLogFile();
+                Toast.makeText(getContext(), "Log file cleared", Toast.LENGTH_SHORT).show();
+            }
+            return true;
+        } else if (id == R.id.debugBuffer) {
+            if (service != null) {
+                service.debugBufferContents();
+                Toast.makeText(getContext(), "Buffer debug info printed to terminal", Toast.LENGTH_SHORT).show();
+            }
+            return true;
+        } else if (id == R.id.showStats) {
+            if (service != null) {
+                service.displayPacketStatistics();
+                Toast.makeText(getContext(), "Packet statistics printed to terminal", Toast.LENGTH_SHORT).show();
+            }
+            return true;
+        } else if (id == R.id.manualReconnect) {
+            if (connected != Connected.True) {
+                retryCount = 0; // Reset retry count for manual reconnect
+                status("Manual reconnect initiated...");
+                connect();
+                Toast.makeText(getContext(), "Manual reconnect initiated", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(getContext(), "Already connected", Toast.LENGTH_SHORT).show();
+            }
+            return true;
+//        } else if (id == R.id.manualHeadingLog) {
+//            if (service != null) {
+//                // Trigger a manual heading log entry
+//                service.triggerManualHeadingLog();
+//                Toast.makeText(getContext(), "Manual heading log entry created", Toast.LENGTH_SHORT).show();
+//                status("Manual heading log entry created");
+//            }
+//            return true;
+        } else if (id == R.id.gpsUpdateInterval) {
+            // Show dialog to change GPS update interval
+            AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+            builder.setTitle("GPS Update Interval (seconds)");
+
+            final EditText input = new EditText(getContext());
+            input.setInputType(InputType.TYPE_CLASS_NUMBER);
+            input.setText("60"); // Default 60 seconds
+            builder.setView(input);
+
+            builder.setPositiveButton("OK", (dialog, which) -> {
+                try {
+                    long interval = Long.parseLong(input.getText().toString());
+                    if (interval < 1) interval = 1; // Minimum 1 second
+                    if (interval > 300) interval = 300; // Maximum 5 minutes
+                    
+                    ((MainActivity) getActivity()).updateLocationInterval(interval);
+                    Toast.makeText(getContext(), "GPS update interval set to " + interval + " seconds", Toast.LENGTH_SHORT).show();
+                    status("GPS update interval: " + interval + " seconds");
+                } catch (NumberFormatException e) {
+                    Toast.makeText(getContext(), "Invalid number", Toast.LENGTH_SHORT).show();
+                }
+            });
+            builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
+            builder.show();
+            return true;
+        } else if (id == R.id.editRotate) {
             //TODO actually change the period in SerialService
             AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
             builder.setTitle("New Rotation Period UNUSED");
@@ -471,13 +648,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     //region Serial
 
-    //import java.nio.ByteBuffer;
-
-
-
-
-
-    private void connect() {
+    public void connect() {
         connect(null);
     }
 
@@ -547,13 +718,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     /**
      * Send a String to the currently connected serial device. Returns immediately if no
-     * device is connected. Additionally appends the sent information to the text on screen.
-     *
-     * This is mostly used for things that are sent as the result of direct user interaction,
-     * so it assumed that we will always want the commands to be displayed. Thus this uses receiveText
-     * directly instead of Mylogger.log_X() as all automatically sent commands should.
+     * device is connected. Additionally appends the sent information to the text on screen
      * */
-    public void send(String str) {
+    private void send(String str) {
         if (connected != Connected.True) {
             Toast.makeText(getActivity(), "not connected", Toast.LENGTH_SHORT).show();
             return;
@@ -573,6 +740,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             SpannableStringBuilder spn = new SpannableStringBuilder(msg + '\n');
             spn.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorSendText)), 0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
             receiveText.append(spn);
+            service.setLastCommand(str);
             service.write(data);
         } catch (SerialTimeoutException e) {
             status("write timeout: " + e.getMessage());
@@ -582,55 +750,51 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     /**
-     * Parse the bytes from SerialService and prints them in readable format to the phone screen.
-     * If those bytes are recognized as a message that is part of BGAPI, prints the message name
-     * rather than the bytes.
-     * If the packet isn't of any recognizable type, currently just dumps the raw output to screen?
+     * Parse the bytes that were received from the serial device. If those bytes are recognized
+     * as a message that is part of BGAPI, prints the message name rather than the bytes
+     * If the message is a packet, parse it into a packet object
      * */
-    private void displayToTerminal(byte[] data) {
+    private void receive(byte[] data) {
 //        SpannableStringBuilder span = new SpannableStringBuilder("##"+TextUtil.toHexString(data)+"\n");
 //        span.setSpan(new ForegroundColorSpan(Color.CYAN), 0, span.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-//        receiveText.append("\n\nNEW THING!!!\n" + span);
-
+//        receiveText.append(span);
         if (BGapi.isScanReportEvent(data)) {
-            //original script recorded time, addr, rssi, channel, and data
-            //TODO: Non-UI logic - should not be in UI class
-            if (pendingPacket != null) {
-                String msg = pendingPacket.toString();
-                if (truncate) {
-                    int length = msg.length();
-                    if (length > msg.lastIndexOf('\n') + 40) {
-                        length = msg.lastIndexOf('\n') + 40;
-                    }
-                    msg = msg.substring(0, length) + "…";
-                }
-                SpannableStringBuilder spn = new SpannableStringBuilder(msg + "\n\n");
-                spn.setSpan(new ForegroundColorSpan(Color.MAGENTA), 0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-                receiveText.append(spn);
-            }
-            if (data.length <= 21)
-                return;
-
-            pendingPacket = BlePacket.parsePacket(data);
-
-        } else if (BGapi.isAngleResponse(data)) {
-            //parsing out end of data to find voltage/angle
-//            String truncData = "";
-//            int pot_int;
-//            for(int i = data.length - 4; i < data.length; i++) {
-//                truncData += String.format("%02X", data[i]);
-//                //pot_int += (pot_int << 8) + (data[i] & 0xFF); // didn't work?
+//            //original script recorded time, addr, rssi, channel, and data
+//            //TODO: Non-UI logic - should not be in UI class
+//            if (pendingPacket != null) {
+//                String msg = pendingPacket.toString();
+//                if (truncate) {
+//                    int length = msg.length();
+//                    if (length > msg.lastIndexOf('\n') + 40) {
+//                        length = msg.lastIndexOf('\n') + 40;
+//                    }
+//                    msg = msg.substring(0, length) + "…";
+//                }
+//                SpannableStringBuilder spn = new SpannableStringBuilder(msg + "\n\n");
+//                spn.setSpan(new ForegroundColorSpan(Color.MAGENTA), 0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+//                receiveText.append(spn);
 //            }
-//            Long pot_long = Long.parseLong(truncData, 16);
-//            pot_int =  Integer.reverseBytes(pot_long.intValue());
-//            float pot_voltage = Float.intBitsToFloat(pot_int);
+//            if (data.length <= 21)
+//                return;
 //
+//            pendingPacket = BlePacket.parsePacket(data);
+        } else if (BGapi.isAngleOrBattResponse(data)) {
+//            byte[] lastTwoBytes = new byte[2];
+////             Extract the last 2 bytes
+//            System.arraycopy(data, data.length - 2, lastTwoBytes, 0, 2); //data bytes are in 14th and 15th positions in the array
+//
+////             Extract the most significant 12 bits into an integer
+//            int pot_bits = ((lastTwoBytes[0] & 0xFF) << 4) | ((lastTwoBytes[1] & 0xF0) >>> 4);
+//
+////             multiply by 1/2^12 (adc resolution)
+//             float pot_voltage = (float) (pot_bits * 0.002);
+//
+////            converts voltage to angle based on calibrated min and max values
+////            before min and max values have been run into and measured, uses pre-measured values
 //            float pot_angle = (float) (((pot_voltage - 0.332) / (2.7 - 0.332)) * 360);
-//            //float pot_angle = (float) (((pot_voltage - 0.332) / (3.3 - 0.332)) * 360);
-//            SensorHelper.setHeading(pot_angle);
-//            receiveText.append("Got angle: " + pot_angle + '\n' //);
-//                    + "Got Voltage: " + pot_voltage + '\n');
-            //+ "Voltage Value:" + pot_voltage + '\n' );
+//
+//            receiveText.append("Angle: " + pot_angle + '\t' +"voltage: " + pot_voltage + "\t" + "Hex: " + pot_bits + '\n');
+//            receiveText.append("Got angle measurement\n");
         } else if(BGapi.isTemperatureResponse(data)){
             int temperature = data[data.length-2];
             SpannableStringBuilder tempSpan = new SpannableStringBuilder("Got temp: "+temperature+"\n");
@@ -642,24 +806,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 receiveText.append(BGapi.getResponseName(data) + '\n');
         } else {
             //until the data has a terminator, assume packets that aren't a known header are data that was truncated
-            if (pendingPacket != null) {
+            if (pendingPacket != null)
                 pendingPacket.appendData(data);
-                pendingPacket = BlePacket.parsePacket(data);
-                if (pendingPacket != null) {
-                    String msg = pendingPacket.toString();
-                    if (truncate) {
-                        int length = msg.length();
-                        if (length > msg.lastIndexOf('\n') + 40) {
-                            length = msg.lastIndexOf('\n') + 40;
-                        }
-                        msg = msg.substring(0, length) + "…";
-                    }
-                    SpannableStringBuilder spn = new SpannableStringBuilder(msg + "\n\n");
-                    spn.setSpan(new ForegroundColorSpan(Color.MAGENTA), 0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    receiveText.append(spn);
-                }
-//                receiveText.append(data + BGapi.getResponseName(data) + '\n');
-            }
         }
 
         //If the text in receiveText is getting too large to be reasonable, cut it off
@@ -670,7 +818,6 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
 
     }
-
 
     /**
      * Print to the textview in a different color so that it stands out
@@ -685,41 +832,58 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     //region SerialListener
 
-    //uses a Handler, which is passed a Runnable to send the start command a specified delay after connecting
+
     @Override
     public void onSerialConnect() {
         status("connected");
         connected = Connected.True;
+        // Reset retry count on successful connection
+        retryCount = 0;
         //send setup and start commands after delay via custom Handler
         Handler handler = new Handler();
-        //Runnable clickSetup = () -> onSetupClicked(null); // makes the baud rate array show up
+        //Runnable clickSetup = () -> onSetupClicked(null);
         //handler.postDelayed(clickSetup, 2500);
         Runnable clickStart = () -> onStartClicked(null);
-        //todo: why do we need to wait this long before starting?
         handler.postDelayed(clickStart, 2700);
     }
 
-    //todo: replace bandaid with more permanent solution
     @Override
     public void onSerialConnectError(Exception e) {
         status("connection failed: " + e.getMessage());
         disconnect();
-        SystemClock.sleep(200);
-        connect();
     }
 
     @Override
     public void onSerialRead(byte[] data) {
-        displayToTerminal(data);
+        receive(data);
     }
+
+    private int retryCount = 0;
+    private static final int MAX_RETRIES = 3;
 
     @Override
     public void onSerialIoError(Exception e) {
         status("connection lost: " + e.getMessage());
-//        status(Log.getStackTraceString(e));
         disconnect();
-        SystemClock.sleep(250);
-        connect();
+
+        if (retryCount < MAX_RETRIES) {
+            retryCount++;
+            status("attempting reconnect... (attempt " + retryCount + " of " + MAX_RETRIES + ")");
+            new Handler().postDelayed(() -> {
+                try {
+                    connect();
+                } catch (Exception reconnectException) {
+                    status("reconnect attempt " + retryCount + " failed: " + reconnectException.getMessage());
+                    // Continue with next retry attempt
+                    if (retryCount < MAX_RETRIES) {
+                        onSerialIoError(reconnectException);
+                    }
+                }
+            }, 1500);
+        } else {
+            status("max retries reached, manual restart required");
+            retryCount = 0; // Reset for next manual connection attempt
+        }
     }
 
     private float[] listToArray(List<Float> list){

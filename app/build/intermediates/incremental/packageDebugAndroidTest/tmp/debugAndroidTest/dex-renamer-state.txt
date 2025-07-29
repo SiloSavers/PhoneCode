@@ -1,0 +1,7 @@
+#Wed Jul 02 15:47:12 MDT 2025
+base.0=C\:\\Users\\beeguy01\\Desktop\\Phone_code\\SSRecieverPhoneCode\\app\\build\\intermediates\\dex\\debugAndroidTest\\mergeProjectDexDebugAndroidTest\\0\\classes.dex
+base.1=C\:\\Users\\beeguy01\\Desktop\\Phone_code\\SSRecieverPhoneCode\\app\\build\\intermediates\\dex\\debugAndroidTest\\mergeProjectDexDebugAndroidTest\\11\\classes.dex
+path.0=0/classes.dex
+path.1=11/classes.dex
+renamed.0=classes.dex
+renamed.1=classes2.dex
