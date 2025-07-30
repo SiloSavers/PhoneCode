@@ -15,3 +15,4 @@ to specifically work with Silicon Labs BGM220x devices using BGAPI
 The app uses the [usb-serial-for-android](https://github.com/mik3y/usb-serial-for-android) library.
 The app is a fork of [SimpleUsbTerminal](https://github.com/kai-morich/SimpleUsbTerminal)
 The app is also a fork of https://github.com/cobysandholtz/CornyPhoneCode/tree/main?tab=readme-ov-file  
+Credits to the Smart Stakes Team
