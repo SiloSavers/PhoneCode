@@ -4,7 +4,7 @@
             "outputFile": "de.kai_morich.simple_usb_terminal.app-mergeDebugResources-30:/values-w360dp-port-v13/values-w360dp-port-v13.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\beeguy01\\.gradle\\caches\\8.13\\transforms\\ff1425bde40e51cf8430527d2d0e0aa8\\transformed\\material-1.6.1\\res\\values-w360dp-port-v13\\values-w360dp-port-v13.xml",
+                    "source": "C:\\Users\\rencher7\\.gradle\\caches\\8.13\\transforms\\ff1425bde40e51cf8430527d2d0e0aa8\\transformed\\material-1.6.1\\res\\values-w360dp-port-v13\\values-w360dp-port-v13.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",

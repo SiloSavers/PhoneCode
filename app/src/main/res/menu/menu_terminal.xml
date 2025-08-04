@@ -37,6 +37,7 @@
     <item
         android:id="@+id/manualUpload"
         android:title="Force Upload Log" />
+    <!--
     <item
         android:id="@+id/manualCW"
         android:title="Rotate CW" />
@@ -53,6 +54,7 @@
         android:id="@+id/manualStop"
         android:title="Rotate Stop" />
 
+
     <item
         android:id="@+id/autoRotate"
         android:title="Auto Rotate" />
@@ -65,6 +67,7 @@
     <item
         android:id="@+id/getAngle"
         android:title="Get Angle" />
+    -->
     <item
         android:id="@+id/showLogPath"
         android:title="Show Log File Path" />

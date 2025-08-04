@@ -4,7 +4,7 @@
             "outputFile": "de.kai_morich.simple_usb_terminal.app-mergeDebugResources-30:/values-v26/values-v26.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\beeguy01\\.gradle\\caches\\8.13\\transforms\\875b8c4bf11e50f5fc29c3033f00cdd0\\transformed\\appcompat-1.4.2\\res\\values-v26\\values-v26.xml",
+                    "source": "C:\\Users\\rencher7\\.gradle\\caches\\8.13\\transforms\\875b8c4bf11e50f5fc29c3033f00cdd0\\transformed\\appcompat-1.4.2\\res\\values-v26\\values-v26.xml",
                     "from": {
                         "startLines": "2,3,4,8,12,16",
                         "startColumns": "4,4,4,4,4,4",

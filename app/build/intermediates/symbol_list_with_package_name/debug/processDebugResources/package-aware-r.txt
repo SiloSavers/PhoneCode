@@ -2486,9 +2486,6 @@ id DisplayAngle
 id FUNCTION
 id META
 id NO_DEBUG
-id RotationStateDisplay
-id RotationStateMax
-id RotationStateMin
 id SHIFT
 id SHOW_ALL
 id SHOW_PATH
@@ -2565,7 +2562,6 @@ id auto
 id autoComplete
 id autoCompleteToEnd
 id autoCompleteToStart
-id autoRotate
 id barrier
 id baseline
 id batteryVoltage
@@ -2599,7 +2595,6 @@ id chip3
 id chip_group
 id chronometer
 id circle_center
-id circularProgress
 id clear
 id clearLog
 id clear_text
@@ -2659,7 +2654,6 @@ id dropdown_noneditable
 id easeIn
 id easeInOut
 id easeOut
-id editRotate
 id edit_query
 id edittext_dropdown_editable
 id edittext_dropdown_noneditable
@@ -2688,7 +2682,6 @@ id forever
 id fragment
 id fragment_container_view_tag
 id fullscreen_header
-id getAngle
 id ghost_view
 id ghost_view_holder
 id gone
@@ -2701,7 +2694,6 @@ id group_divider
 id groups
 id guideline
 id header_title
-id heading_range_toggle
 id hideable
 id home
 id homeAsUp
@@ -2730,13 +2722,8 @@ id line3
 id linear
 id listMode
 id list_item
-id manualCCW
-id manualCW
-id manualFast
 id manualHeadingLog
 id manualReconnect
-id manualSlow
-id manualStop
 id manualUpload
 id masked
 id material_clock_display
@@ -2872,7 +2859,6 @@ id showTitle
 id sin
 id skipCollapsed
 id slide
-id slider
 id snackbar_action
 id snackbar_text
 id snap
@@ -2896,9 +2882,7 @@ id start_btn
 id staticLayout
 id staticPostLayout
 id stop
-id stopAutoRotate
 id stop_btn
-id stop_motor_btn
 id stop_upload_btn
 id stretch
 id submenuarrow

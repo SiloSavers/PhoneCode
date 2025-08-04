@@ -105,17 +105,17 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private TextView receiveText;
 
-    private CircularProgressIndicator circularProgress;
+    //private CircularProgressIndicator circularProgress;
 
     private TextView angleDisplayText;
 
     private TextView batteryDisplayText;
-    private TextView rotationStateDisplayText;
+    //private TextView rotationStateDisplayText;
 
-    private TextView rotationMinDisplay;
+    //private TextView rotationMinDisplay;
 
-    private TextView rotationMaxDisplay;
-    private RangeSlider headingSlider;
+    //private TextView rotationMaxDisplay;
+    //private RangeSlider headingSlider;
     private BlePacket pendingPacket;
 
     private Connected connected = Connected.False;
@@ -145,7 +145,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     }
 
     public static final String RECEIVE_HEADING_STATE = "TerminalFragment.RECEIVE_HEADING_STATE";
-    public static final String RECEIVE_ROTATION_STATE = "TerminalFragment.RECEIVE_ROTATION_STATE";
+    //public static final String RECEIVE_ROTATION_STATE = "TerminalFragment.RECEIVE_ROTATION_STATE";
 
     public static final String RECEIVE_BATTERY_VOLTAGE = "TerminalFragment.RECEIVE_BATTERY_VOLTAGE";
 
@@ -166,11 +166,11 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             Integer color = null;
 //            System.out.println(intent.getAction());
             if (intent.getAction().equals(RECEIVE_HEADING_STATE)){
-                String state = intent.getStringExtra(RECEIVE_ROTATION_STATE);
+                //String state = intent.getStringExtra(RECEIVE_ROTATION_STATE);
                 double angle = intent.getFloatExtra(RECEIVE_ANGLE, 0); //todo: why does 0.0 not work here?
                 String formattedAngle = "Angle: " + String.format("%-7.1f", angle);
                 angleDisplayText.setText(formattedAngle);
-                rotationStateDisplayText.setText(state);
+                //rotationStateDisplayText.setText(state);
 //                System.out.println("heading received: "+ angle);
             } else if (intent.getAction().equals(RECEIVE_BATTERY_VOLTAGE))  {
                 System.out.println("receive battery voltage intent");
@@ -259,14 +259,16 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         if (service != null && !getActivity().isChangingConfigurations())
             service.detach();
 
-        SharedPreferences.Editor editor = sharedPref.edit();
-        List<Float> values = headingSlider.getValues();
+        //SharedPreferences.Editor editor = sharedPref.edit();
+        //List<Float> values = headingSlider.getValues();
+        /*
         editor.putFloat("heading_min", values.get(0))
                 .putFloat("heading_max", values.get(1))
                 .apply();
 
 
         Log.d("TerminalFragment", "Wrote from onStop: "+values.get(0)+", "+values.get(1));
+        */
 
         super.onStop();
     }
@@ -355,15 +357,15 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         batteryDisplayText.setText("Batt Voltage:");
 
         //setup rotation state display view
-        rotationStateDisplayText = view.findViewById(R.id.RotationStateDisplay);
-        rotationStateDisplayText.setText("rotation State: ");
+        //rotationStateDisplayText = view.findViewById(R.id.RotationStateDisplay);
+        //rotationStateDisplayText.setText("rotation State: ");
 
-        circularProgress = view.findViewById(R.id.circularProgress);
+        //circularProgress = view.findViewById(R.id.circularProgress);
 
         //start point is
 
-        circularProgress.setRotation(195f);
-        circularProgress.setProgress(90);
+        //circularProgress.setRotation(195f);
+        //circularProgress.setProgress(90);
 
 
         View stopUploadBtn = view.findViewById(R.id.stop_upload_btn);
@@ -374,7 +376,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             stopIntent.putExtra(FirebaseService.KEY_NOTIFICATION_ID, ServiceNotification.notificationId);
             FirebaseService.Companion.getInstance().sendBroadcast(stopIntent);
         });
-
+    /*
         SwitchCompat stopMotorBtn = view.findViewById(R.id.stop_motor_btn);
         stopMotorBtn.setOnCheckedChangeListener((buttonView, isChecked) -> {
             Intent stopMotorIntent = new Intent(getContext(), SerialService.ActionListener.class);
@@ -382,18 +384,20 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             stopMotorIntent.putExtra(SerialService.KEY_MOTOR_SWITCH_STATE, isChecked);
             SerialService.getInstance().sendBroadcast(stopMotorIntent);
         });
+        */
 
-        headingSlider = view.findViewById(R.id.slider);
+        //headingSlider = view.findViewById(R.id.slider);
         //load the min/max from local storage
         sharedPref = getContext().getSharedPreferences(PREFERENCE_FILE, Context.MODE_PRIVATE);
-        float headingMin = sharedPref.getFloat("heading_min", /*default*/20.0f);
-        float headingMax = sharedPref.getFloat("heading_max", /*default*/270.0f);
-        circularProgress.setRotation( 180f + headingMin);
+        //float headingMin = sharedPref.getFloat("heading_min", /*default*/20.0f);
+        //float headingMax = sharedPref.getFloat("heading_max", /*default*/270.0f);
+        /*circularProgress.setRotation( 180f + headingMin);
         circularProgress.setProgress((int) ((headingMax - headingMin)/3.6f));
-
+        */
         //load the min/max from the slider at start
 //        float headingMin = 20.0f;
 //        float headingMax = 270.0f;
+        /*
         Log.d("TerminalFragment", "Loaded min/max: "+headingMin+", "+headingMax);
         headingSlider.setValues(Arrays.asList(headingMin, headingMax));
         headingSlider.addOnChangeListener((rangeSlider, value, fromUser) -> {
@@ -405,8 +409,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 // turns out List.ToArray() can only return Object[], so use a custom method for float[]
                 float[] arr = listToArray(rangeSlider.getValues());
 
-                rotationMinDisplay.setText(new StringBuilder().append("Min: ").append(String.format("%.0f", arr[0])).toString());
-                rotationMaxDisplay.setText(new StringBuilder().append("Max: ").append(String.format("%.0f", arr[1])).toString());
+                //rotationMinDisplay.setText(new StringBuilder().append("Min: ").append(String.format("%.0f", arr[0])).toString());
+                //rotationMaxDisplay.setText(new StringBuilder().append("Max: ").append(String.format("%.0f", arr[1])).toString());
 
                 circularProgress.setRotation( 180f + arr[0]);
                 circularProgress.setProgress((int) ((arr[1] - arr[0])/3.6f));
@@ -415,23 +419,23 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 SerialService.getInstance().sendBroadcast(headingRangeIntent);
             }
         });
+*/
+        //rotationMinDisplay = view.findViewById(R.id.RotationStateMin);
+        //rotationMinDisplay.setText(new StringBuilder().append("Min: ").append(headingMin).toString());
 
-        rotationMinDisplay = view.findViewById(R.id.RotationStateMin);
-        rotationMinDisplay.setText(new StringBuilder().append("Min: ").append(headingMin).toString());
-
-        rotationMaxDisplay = view.findViewById(R.id.RotationStateMax);
-        rotationMaxDisplay.setText(new StringBuilder().append("Max: ").append(headingMax).toString());
+        //rotationMaxDisplay = view.findViewById(R.id.RotationStateMax);
+        //rotationMaxDisplay.setText(new StringBuilder().append("Max: ").append(headingMax).toString());
 
         //broadcast the start values
         Intent headingRangeIntent = new Intent(getContext(), SerialService.ActionListener.class);
         headingRangeIntent.setAction(SerialService.KEY_HEADING_RANGE_ACTION);
 
-        float[] arr = {headingMin, headingMax};
+        //float[] arr = {headingMin, headingMax};
 
-        headingRangeIntent.putExtra(SerialService.KEY_HEADING_RANGE_STATE, arr);
+        //headingRangeIntent.putExtra(SerialService.KEY_HEADING_RANGE_STATE, arr);
         SerialService.getInstance().sendBroadcast(headingRangeIntent);
 
-
+/*
         SwitchCompat toggleHeadingBtn = view.findViewById(R.id.heading_range_toggle);
         toggleHeadingBtn.setOnCheckedChangeListener((buttonView, isChecked) -> {
             Activity activity = getActivity();
@@ -441,6 +445,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 headingMinAsMaxIntent.putExtra(SerialService.KEY_HEADING_MIN_AS_MAX_STATE, isChecked);
                 SerialService.getInstance().sendBroadcast(headingMinAsMaxIntent);
             }
+            /*
             if(isChecked){
                 headingSlider.setTrackActiveTintList(ColorStateList.valueOf(getResources().getColor(R.color.colorPrimary)));
                 headingSlider.setTrackInactiveTintList(ColorStateList.valueOf(getResources().getColor(R.color.material_on_surface_disabled)));
@@ -448,7 +453,8 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 headingSlider.setTrackActiveTintList(ColorStateList.valueOf(getResources().getColor(R.color.material_on_surface_disabled)));
                 headingSlider.setTrackInactiveTintList(ColorStateList.valueOf(getResources().getColor(R.color.colorPrimary)));
             }
-        });
+            *
+        }); */
 
         View startBtn = view.findViewById(R.id.start_btn);
         startBtn.setOnClickListener(this::onStartClicked);
@@ -527,7 +533,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 status("Packet output format: " + status);
             }
             return true;
-        } else if (id == R.id.manualCW) {
+        } /*else if (id == R.id.manualCW) {
             send(BGapi.ROTATE_CW);
             //SystemClock.sleep(500);
             //send(BGapi.ROTATE_STOP);
@@ -549,7 +555,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         } else if (id == R.id.getAngle) {
             send(BGapi.GET_ANGLE);
             return true;
-        } else if (id == R.id.showLogPath) {
+        } */else if (id == R.id.showLogPath) {
             if (service != null) {
                 String logPath = service.getLogFilePath();
                 if (logPath != null) {
@@ -622,7 +628,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             builder.setNegativeButton("Cancel", (dialog, which) -> dialog.cancel());
             builder.show();
             return true;
-        } else if (id == R.id.editRotate) {
+        } /*else if (id == R.id.editRotate) {
             //TODO actually change the period in SerialService
             AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
             builder.setTitle("New Rotation Period UNUSED");
@@ -639,7 +645,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             builder.show();
 
             return true;
-        } else {
+        } */else {
             return super.onOptionsItemSelected(item);
         }
     }

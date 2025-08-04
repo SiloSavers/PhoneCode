@@ -4,41 +4,24 @@
             "outputFile": "de.kai_morich.simple_usb_terminal.app-mergeDebugResources-30:/values-ka/values-ka.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\beeguy01\\.gradle\\caches\\8.13\\transforms\\fef29daa3e21616cc6a61baacb800b29\\transformed\\play-services-basement-18.1.0\\res\\values-ka\\values.xml",
+                    "source": "C:\\Users\\rencher7\\.gradle\\caches\\8.13\\transforms\\ddcd51ea721228f974031286217cec60\\transformed\\browser-1.4.0\\res\\values-ka\\values-ka.xml",
                     "from": {
-                        "startLines": "4",
-                        "startColumns": "0",
-                        "startOffsets": "195",
-                        "endColumns": "138",
-                        "endOffsets": "333"
+                        "startLines": "2,3,4,5",
+                        "startColumns": "4,4,4,4",
+                        "startOffsets": "55,161,264,374",
+                        "endColumns": "105,102,109,104",
+                        "endOffsets": "156,259,369,474"
                     },
                     "to": {
-                        "startLines": "45",
-                        "startColumns": "4",
-                        "startOffsets": "4387",
-                        "endColumns": "142",
-                        "endOffsets": "4525"
+                        "startLines": "55,58,59,60",
+                        "startColumns": "4,4,4,4",
+                        "startOffsets": "5597,5867,5970,6080",
+                        "endColumns": "105,102,109,104",
+                        "endOffsets": "5698,5965,6075,6180"
                     }
                 },
                 {
-                    "source": "C:\\Users\\beeguy01\\.gradle\\caches\\8.13\\transforms\\e50b32c206a4082058b65fa7090b548f\\transformed\\core-1.8.0\\res\\values-ka\\values-ka.xml",
-                    "from": {
-                        "startLines": "2",
-                        "startColumns": "4",
-                        "startOffsets": "55",
-                        "endColumns": "100",
-                        "endOffsets": "151"
-                    },
-                    "to": {
-                        "startLines": "110",
-                        "startColumns": "4",
-                        "startOffsets": "10069",
-                        "endColumns": "100",
-                        "endOffsets": "10165"
-                    }
-                },
-                {
-                    "source": "C:\\Users\\beeguy01\\.gradle\\caches\\8.13\\transforms\\ff1425bde40e51cf8430527d2d0e0aa8\\transformed\\material-1.6.1\\res\\values-ka\\values-ka.xml",
+                    "source": "C:\\Users\\rencher7\\.gradle\\caches\\8.13\\transforms\\ff1425bde40e51cf8430527d2d0e0aa8\\transformed\\material-1.6.1\\res\\values-ka\\values-ka.xml",
                     "from": {
                         "startLines": "2,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -57,7 +40,24 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\beeguy01\\.gradle\\caches\\8.13\\transforms\\b85f0b1905ef9e542cc91d70dc73ffb0\\transformed\\play-services-base-18.1.0\\res\\values-ka\\values.xml",
+                    "source": "C:\\Users\\rencher7\\.gradle\\caches\\8.13\\transforms\\fef29daa3e21616cc6a61baacb800b29\\transformed\\play-services-basement-18.1.0\\res\\values-ka\\values.xml",
+                    "from": {
+                        "startLines": "4",
+                        "startColumns": "0",
+                        "startOffsets": "195",
+                        "endColumns": "138",
+                        "endOffsets": "333"
+                    },
+                    "to": {
+                        "startLines": "45",
+                        "startColumns": "4",
+                        "startOffsets": "4387",
+                        "endColumns": "142",
+                        "endOffsets": "4525"
+                    }
+                },
+                {
+                    "source": "C:\\Users\\rencher7\\.gradle\\caches\\8.13\\transforms\\b85f0b1905ef9e542cc91d70dc73ffb0\\transformed\\play-services-base-18.1.0\\res\\values-ka\\values.xml",
                     "from": {
                         "startLines": "4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20",
                         "startColumns": "0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0",
@@ -74,7 +74,7 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\beeguy01\\.gradle\\caches\\8.13\\transforms\\875b8c4bf11e50f5fc29c3033f00cdd0\\transformed\\appcompat-1.4.2\\res\\values-ka\\values-ka.xml",
+                    "source": "C:\\Users\\rencher7\\.gradle\\caches\\8.13\\transforms\\875b8c4bf11e50f5fc29c3033f00cdd0\\transformed\\appcompat-1.4.2\\res\\values-ka\\values-ka.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -91,20 +91,20 @@
                     }
                 },
                 {
-                    "source": "C:\\Users\\beeguy01\\.gradle\\caches\\8.13\\transforms\\ddcd51ea721228f974031286217cec60\\transformed\\browser-1.4.0\\res\\values-ka\\values-ka.xml",
+                    "source": "C:\\Users\\rencher7\\.gradle\\caches\\8.13\\transforms\\e50b32c206a4082058b65fa7090b548f\\transformed\\core-1.8.0\\res\\values-ka\\values-ka.xml",
                     "from": {
-                        "startLines": "2,3,4,5",
-                        "startColumns": "4,4,4,4",
-                        "startOffsets": "55,161,264,374",
-                        "endColumns": "105,102,109,104",
-                        "endOffsets": "156,259,369,474"
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "100",
+                        "endOffsets": "151"
                     },
                     "to": {
-                        "startLines": "55,58,59,60",
-                        "startColumns": "4,4,4,4",
-                        "startOffsets": "5597,5867,5970,6080",
-                        "endColumns": "105,102,109,104",
-                        "endOffsets": "5698,5965,6075,6180"
+                        "startLines": "110",
+                        "startColumns": "4",
+                        "startOffsets": "10069",
+                        "endColumns": "100",
+                        "endOffsets": "10165"
                     }
                 }
             ]

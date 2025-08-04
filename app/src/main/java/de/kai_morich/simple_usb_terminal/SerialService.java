@@ -119,7 +119,7 @@ public class SerialService extends Service implements SerialListener {
     public static float potAngle = 0.0f;
 
     //adding to this pushes out the oldest element if the buffer is full, allowing for time series averaging and other functions
-    public AngleMeasSeries angleMeasSeries = new AngleMeasSeries(5);
+    //public AngleMeasSeries angleMeasSeries = new AngleMeasSeries(5);
 
     public static float lastBatteryVoltage = 0.0f;
 
@@ -338,7 +338,7 @@ public class SerialService extends Service implements SerialListener {
 
     void send_heading_intent() {
         Intent intent = new Intent(TerminalFragment.RECEIVE_HEADING_STATE);
-        intent.putExtra(TerminalFragment.RECEIVE_ROTATION_STATE, rotationState.toString());
+        //intent.putExtra(TerminalFragment.RECEIVE_ROTATION_STATE, rotationState.toString());
         intent.putExtra(TerminalFragment.RECEIVE_ANGLE, potAngle);
         LocalBroadcastManager.getInstance(getApplicationContext()).sendBroadcast(intent);
     }
@@ -1170,7 +1170,7 @@ public class SerialService extends Service implements SerialListener {
             float pot_voltage = (float) (pot_bits * 0.002);
             potAngle = (float) (((pot_voltage - 0.332) / (2.7 - 0.332)) * 360);
             
-            Boolean isMoving = angleMeasSeries.addMeasurementFiltered(potAngle);
+            Boolean isMoving = false;//angleMeasSeries.addMeasurementFiltered(potAngle);
             if (isMoving && !shouldbeMoving) {
                 try {
                     write(TextUtil.fromHexString(BGapi.ROTATE_STOP));
