@@ -35,6 +35,8 @@
     <usb-device vendor-id="3368" product-id="516"  /> <!-- 0x0d28 / 0x0204: ARM mbed -->
     <usb-device vendor-id="1155" product-id="22336" /><!-- 0x0483 / 0x5740: ST CDC -->
     <usb-device vendor-id="10755" product-id="67" />  <!-- 0x2A03 / 0x0043: Arduino Uno-->
+    <usb-device vendor-id="6890" product-id="29987" />  <!-- 0x1A86 / 0x7523: Arduino Nano-->
+
 
     <!-- - - - custom prober - - - -->
     <usb-device vendor-id="4966" product-id="0261" /> <!-- 0x1366 / 0x0105: SiLabs BGM220x -->

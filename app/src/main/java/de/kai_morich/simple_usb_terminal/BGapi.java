@@ -48,18 +48,10 @@ public class BGapi {
         commands.put("message_get_temp", "2002FF000104");
     }
 
-    public static final String SCANNER_SET_MODE = commands.get("scanner_set_mode");
-    public static final String SCANNER_SET_TIMING = commands.get("scanner_set_timing");
-    public static final String CONNECTION_SET_PARAMETERS = commands.get("connection_set_parameters");
+
     public static final String SCANNER_START = commands.get("scanner_start");
     public static final String SCANNER_STOP = commands.get("scanner_stop");
-    public static final String ROTATE_CW = commands.get("message_rotate_cw");
-    public static final String ROTATE_CCW = commands.get("message_rotate_ccw");
-    public static final String ROTATE_STOP = commands.get("message_rotate_stop");
-    public static final String ROTATE_SLOW = commands.get("message_rotate_slow");
-    public static final String ROTATE_FAST = commands.get("message_rotate_fast");
-    public static final String GET_ANGLE = commands.get("message_read_pot_angle");
-    public static final String GET_TEMP = commands.get("message_get_temp");
+
 
     public static boolean isScanReportEvent(byte[] bytes) {
         // Note: the casting of 0xA1 is necessary because Java thinks that signed hex should exist?

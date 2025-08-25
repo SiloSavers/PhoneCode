@@ -2623,7 +2623,6 @@ id customPanel
 id cut
 id dark
 id date_picker_actions
-id debugBuffer
 id decelerate
 id decelerateAndComplete
 id decor_content_parent
@@ -2634,7 +2633,6 @@ id design_menu_item_action_area
 id design_menu_item_action_area_stub
 id design_menu_item_text
 id design_navigation_view
-id detailedPacketOutput
 id dialog_button
 id dimensions
 id direct
@@ -2722,7 +2720,6 @@ id line3
 id linear
 id listMode
 id list_item
-id manualHeadingLog
 id manualReconnect
 id manualUpload
 id masked
@@ -2854,7 +2851,6 @@ id shortcut
 id showCustom
 id showHome
 id showLogPath
-id showStats
 id showTitle
 id sin
 id skipCollapsed

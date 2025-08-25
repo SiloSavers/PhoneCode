@@ -111,9 +111,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     private TextView batteryDisplayText;
     //private TextView rotationStateDisplayText;
-
     //private TextView rotationMinDisplay;
-
     //private TextView rotationMaxDisplay;
     //private RangeSlider headingSlider;
     private BlePacket pendingPacket;
@@ -121,7 +119,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     private Connected connected = Connected.False;
     private boolean initialStart = true;
     private boolean truncate = true;
-    private int rotatePeriod = 500;
+    //private int rotatePeriod = 500;
 
     private SharedPreferences sharedPref;
 
@@ -427,6 +425,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         //rotationMaxDisplay.setText(new StringBuilder().append("Max: ").append(headingMax).toString());
 
         //broadcast the start values
+        /* Removed this section because Serial Service has been changed
         Intent headingRangeIntent = new Intent(getContext(), SerialService.ActionListener.class);
         headingRangeIntent.setAction(SerialService.KEY_HEADING_RANGE_ACTION);
 
@@ -434,7 +433,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
         //headingRangeIntent.putExtra(SerialService.KEY_HEADING_RANGE_STATE, arr);
         SerialService.getInstance().sendBroadcast(headingRangeIntent);
-
+*/
 /*
         SwitchCompat toggleHeadingBtn = view.findViewById(R.id.heading_range_toggle);
         toggleHeadingBtn.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -505,9 +504,9 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
     public void onCreateOptionsMenu(@NonNull Menu menu, MenuInflater inflater) {
         inflater.inflate(R.menu.menu_terminal, menu);
         menu.findItem(R.id.truncate).setChecked(truncate);
-        if (service != null) {
+        /*if (service != null) {
             menu.findItem(R.id.detailedPacketOutput).setChecked(service.isUseDetailedPacketOutput());
-        }
+        } */
     }
 
     @Override
@@ -523,7 +522,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             truncate = !truncate;
             item.setChecked(truncate);
             return true;
-        } else if (id == R.id.detailedPacketOutput) {
+        } /*else if (id == R.id.detailedPacketOutput) {
             if (service != null) {
                 boolean newState = !service.isUseDetailedPacketOutput();
                 service.setUseDetailedPacketOutput(newState);
@@ -533,7 +532,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 status("Packet output format: " + status);
             }
             return true;
-        } /*else if (id == R.id.manualCW) {
+        } else if (id == R.id.manualCW) {
             send(BGapi.ROTATE_CW);
             //SystemClock.sleep(500);
             //send(BGapi.ROTATE_STOP);
@@ -572,7 +571,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 Toast.makeText(getContext(), "Log file cleared", Toast.LENGTH_SHORT).show();
             }
             return true;
-        } else if (id == R.id.debugBuffer) {
+        } /*else if (id == R.id.debugBuffer) {
             if (service != null) {
                 service.debugBufferContents();
                 Toast.makeText(getContext(), "Buffer debug info printed to terminal", Toast.LENGTH_SHORT).show();
@@ -584,7 +583,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
                 Toast.makeText(getContext(), "Packet statistics printed to terminal", Toast.LENGTH_SHORT).show();
             }
             return true;
-        } else if (id == R.id.manualReconnect) {
+        } */else if (id == R.id.manualReconnect) {
             if (connected != Connected.True) {
                 retryCount = 0; // Reset retry count for manual reconnect
                 status("Manual reconnect initiated...");
@@ -703,6 +702,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
 
         connected = Connected.Pending;
+        Toast.makeText(getContext(), "pending!", Toast.LENGTH_SHORT).show();
         try {
             usbSerialPort.open(usbConnection);
             usbSerialPort.setParameters(baudRate, UsbSerialPort.DATABITS_8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE);
@@ -733,6 +733,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
         }
         try {
             //TODO: Non-UI logic - should not be in UI class
+            Toast.makeText(getContext(), "dk connected", Toast.LENGTH_SHORT).show();
             String msg;
             byte[] data;
             StringBuilder sb = new StringBuilder();
@@ -746,12 +747,14 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
             SpannableStringBuilder spn = new SpannableStringBuilder(msg + '\n');
             spn.setSpan(new ForegroundColorSpan(getResources().getColor(R.color.colorSendText)), 0, spn.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
             receiveText.append(spn);
-            service.setLastCommand(str);
+            //service.setLastCommand(str);
             service.write(data);
         } catch (SerialTimeoutException e) {
             status("write timeout: " + e.getMessage());
+            Toast.makeText(getContext(), "Timeout error", Toast.LENGTH_SHORT).show();
         } catch (Exception e) {
             onSerialIoError(e);
+            Toast.makeText(getContext(), "Other Error!", Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -841,6 +844,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onSerialConnect() {
+        Toast.makeText(getContext(), "normal!", Toast.LENGTH_SHORT).show();
         status("connected");
         connected = Connected.True;
         // Reset retry count on successful connection
@@ -855,6 +859,7 @@ public class TerminalFragment extends Fragment implements ServiceConnection, Ser
 
     @Override
     public void onSerialConnectError(Exception e) {
+        //Toast.makeText(getContext(), "NOT NORMAL!", Toast.LENGTH_SHORT).show();
         status("connection failed: " + e.getMessage());
         disconnect();
     }

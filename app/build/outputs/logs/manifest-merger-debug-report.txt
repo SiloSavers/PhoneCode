@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:2:1-85:12
-INJECTED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:2:1-85:12
-INJECTED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:2:1-85:12
-INJECTED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:2:1-85:12
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:2:1-87:12
+INJECTED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:2:1-87:12
+INJECTED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:2:1-87:12
+INJECTED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:2:1-87:12
 MERGED from [com.github.mik3y:usb-serial-for-android:3.4.3] C:\Users\rencher7\.gradle\caches\8.13\transforms\c0ace4b14701369fc712e93266a056b7\transformed\usb-serial-for-android-3.4.3\AndroidManifest.xml:2:1-9:12
 MERGED from [com.google.android.material:material:1.6.1] C:\Users\rencher7\.gradle\caches\8.13\transforms\ff1425bde40e51cf8430527d2d0e0aa8\transformed\material-1.6.1\AndroidManifest.xml:17:1-26:12
 MERGED from [androidx.constraintlayout:constraintlayout:2.0.1] C:\Users\rencher7\.gradle\caches\8.13\transforms\b150da889d9dd49684381006763b1a54\transformed\constraintlayout-2.0.1\AndroidManifest.xml:2:1-11:12
@@ -103,9 +103,15 @@ MERGED from [androidx.work:work-runtime:2.7.1] C:\Users\rencher7\.gradle\caches\
 MERGED from [androidx.work:work-runtime:2.7.1] C:\Users\rencher7\.gradle\caches\8.13\transforms\e0b77555ec99069971e82a76fabe3f2e\transformed\work-runtime-2.7.1\AndroidManifest.xml:25:5-68
 	android:name
 		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:9:22-65
+uses-feature#android.hardware.usb.host
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:11:5-86
+	android:required
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:11:60-83
+	android:name
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:11:19-59
 application
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:12:5-83:19
-INJECTED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:12:5-83:19
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:14:5-85:19
+INJECTED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:14:5-85:19
 MERGED from [com.google.android.material:material:1.6.1] C:\Users\rencher7\.gradle\caches\8.13\transforms\ff1425bde40e51cf8430527d2d0e0aa8\transformed\material-1.6.1\AndroidManifest.xml:24:5-20
 MERGED from [com.google.android.material:material:1.6.1] C:\Users\rencher7\.gradle\caches\8.13\transforms\ff1425bde40e51cf8430527d2d0e0aa8\transformed\material-1.6.1\AndroidManifest.xml:24:5-20
 MERGED from [androidx.constraintlayout:constraintlayout:2.0.1] C:\Users\rencher7\.gradle\caches\8.13\transforms\b150da889d9dd49684381006763b1a54\transformed\constraintlayout-2.0.1\AndroidManifest.xml:9:5-20
@@ -153,117 +159,117 @@ MERGED from [androidx.room:room-runtime:2.2.5] C:\Users\rencher7\.gradle\caches\
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.8.0] C:\Users\rencher7\.gradle\caches\8.13\transforms\e50b32c206a4082058b65fa7090b548f\transformed\core-1.8.0\AndroidManifest.xml:24:18-86
 	android:label
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:14:9-41
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:16:9-41
 	tools:ignore
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:16:9-60
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:18:9-60
 	android:icon
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:13:9-43
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:15:9-43
 	android:theme
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:15:9-40
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:17:9-40
 activity#de.kai_morich.simple_usb_terminal.MainActivity
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:21:9-43:20
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:23:9-45:20
 	android:launchMode
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:23:13-44
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:25:13-44
 	android:windowSoftInputMode
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:24:13-67
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:26:13-67
 	android:exported
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:25:13-36
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:27:13-36
 	android:directBootAware
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:26:13-43
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:28:13-43
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:22:13-41
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:24:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:27:13-30:29
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:29:13-32:29
 action#android.intent.action.MAIN
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:28:17-69
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:30:17-69
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:28:25-66
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:30:25-66
 category#android.intent.category.LAUNCHER
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:29:17-77
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:31:17-77
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:29:27-74
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:31:27-74
 intent-filter#action:name:android.hardware.usb.action.USB_DEVICE_ATTACHED
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:31:13-33:29
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:33:13-35:29
 action#android.hardware.usb.action.USB_DEVICE_ATTACHED
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:32:17-90
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:34:17-90
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:32:25-87
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:34:25-87
 meta-data#android.hardware.usb.action.USB_DEVICE_ATTACHED
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:40:13-42:61
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:42:13-44:61
 	android:resource
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:42:17-58
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:44:17-58
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:41:17-79
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:43:17-79
 service#de.kai_morich.simple_usb_terminal.SerialService
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:44:9-50
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:46:9-50
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:44:18-47
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:46:18-47
 service#de.kai_morich.simple_usb_terminal.SensorHelper
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:45:9-49
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:47:9-49
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:45:18-46
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:47:18-46
 service#de.kai_morich.simple_usb_terminal.FirebaseService
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:46:9-52
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:48:9-52
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:46:18-49
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:48:18-49
 receiver#de.kai_morich.simple_usb_terminal.FirebaseService$ActionListener
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:47:9-68
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:49:9-68
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:47:19-65
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:49:19-65
 receiver#de.kai_morich.simple_usb_terminal.SerialService$ActionListener
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:48:9-66
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:50:9-66
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:48:19-63
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:50:19-63
 receiver#de.kai_morich.simple_usb_terminal.RestarterBroadcastReceiver
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:49:9-59:20
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:51:9-61:20
 	android:enabled
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:51:13-35
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:53:13-35
 	android:label
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:50:13-47
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:52:13-47
 	android:exported
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:52:13-36
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:54:13-36
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:49:19-61
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:51:19-61
 intent-filter#action:name:android.intent.action.BOOT_COMPLETED+action:name:android.intent.action.MY_PACKAGE_REPLACED+action:name:android.intent.action.QUICKBOOT_POWERON+category:name:android.intent.category.DEFAULT
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:53:13-58:29
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:55:13-60:29
 action#android.intent.action.BOOT_COMPLETED
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:54:17-79
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:56:17-79
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:54:25-76
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:56:25-76
 action#android.intent.action.QUICKBOOT_POWERON
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:55:17-82
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:57:17-82
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:55:25-79
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:57:25-79
 action#android.intent.action.MY_PACKAGE_REPLACED
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:56:17-84
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:58:17-84
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:56:25-81
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:58:25-81
 category#android.intent.category.DEFAULT
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:57:17-76
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:59:17-76
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:57:27-73
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:59:27-73
 receiver#de.kai_morich.simple_usb_terminal.LocationBroadcastReceiver
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:60:9-65:20
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:62:9-67:20
 	android:exported
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:61:13-36
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:63:13-36
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:60:19-60
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:62:19-60
 intent-filter#action:name:de.kai_morich.simple_usb_terminal.LocationBroadcastReceiver.ACTION_PROCESS_UPDATES
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:62:13-64:29
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:64:13-66:29
 action#de.kai_morich.simple_usb_terminal.LocationBroadcastReceiver.ACTION_PROCESS_UPDATES
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:63:17-125
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:65:17-125
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:63:25-122
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:65:25-122
 receiver#de.kai_morich.simple_usb_terminal.MyDeviceAdminReceiver
-ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:66:9-71:15
+ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:68:9-73:15
 	android:label
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:69:13-45
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:71:13-45
 	android:permission
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:70:13-70
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:72:13-70
 	android:description
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:68:13-51
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:70:13-51
 	android:name
-		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:67:13-50
+		ADDED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml:69:13-50
 uses-sdk
 INJECTED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from C:\Users\rencher7\Silo_Savers\PhoneCode\app\src\main\AndroidManifest.xml

@@ -48,9 +48,9 @@ public class BlePacket {
     private BlePacket(String addr, byte rssi, byte channel, byte packet_type, byte[] data) {
         time = LocalDateTime.now();
         magHeading = SensorHelper.getMagnetometerReadingSingleDim();
-        potHeading = SerialService.getPotAngle();
-        battVoltage = SerialService.getBatteryVoltage();
-        phoneCharge = SerialService.getPhoneChargePercent();
+        potHeading = 0;
+        battVoltage = 0;//SerialService.getBatteryVoltage(); //Need to fix these few lines of code because functions were removed
+        phoneCharge = 0;//SerialService.getPhoneChargePercent();
 
         Location location = LocationBroadcastReceiver.Companion.getCurrentLocation();
         if (location != null) {

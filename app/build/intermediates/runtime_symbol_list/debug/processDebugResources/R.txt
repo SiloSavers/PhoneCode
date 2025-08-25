@@ -2622,7 +2622,6 @@ int id customPanel 0x7f090092
 int id cut 0x7f090093
 int id dark 0x7f090094
 int id date_picker_actions 0x7f090095
-int id debugBuffer 0x7f090096
 int id decelerate 0x7f090097
 int id decelerateAndComplete 0x7f090098
 int id decor_content_parent 0x7f090099
@@ -2633,7 +2632,6 @@ int id design_menu_item_action_area 0x7f09009d
 int id design_menu_item_action_area_stub 0x7f09009e
 int id design_menu_item_text 0x7f09009f
 int id design_navigation_view 0x7f0900a0
-int id detailedPacketOutput 0x7f0900a1
 int id dialog_button 0x7f0900a2
 int id dimensions 0x7f0900a3
 int id direct 0x7f0900a4
@@ -2721,7 +2719,6 @@ int id line3 0x7f0900f8
 int id linear 0x7f0900f9
 int id listMode 0x7f0900fa
 int id list_item 0x7f0900fb
-int id manualHeadingLog 0x7f0900ff
 int id manualReconnect 0x7f090100
 int id manualUpload 0x7f090103
 int id masked 0x7f090104
@@ -2853,7 +2850,6 @@ int id shortcut 0x7f090181
 int id showCustom 0x7f090182
 int id showHome 0x7f090183
 int id showLogPath 0x7f090184
-int id showStats 0x7f090185
 int id showTitle 0x7f090186
 int id sin 0x7f090187
 int id skipCollapsed 0x7f090188

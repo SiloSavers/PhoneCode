@@ -4,6 +4,10 @@
         "source": "C:\\Users\\rencher7\\.gradle\\daemon\\8.13\\de.kai_morich.simple_usb_terminal.app-main-34:\\drawable-xhdpi\\ic_notification.png"
     },
     {
+        "merged": "de.kai_morich.simple_usb_terminal.app-debug-32:/xml_usb_device_filter.xml.flat",
+        "source": "de.kai_morich.simple_usb_terminal.app-main-34:/xml/usb_device_filter.xml"
+    },
+    {
         "merged": "C:\\Users\\rencher7\\.gradle\\daemon\\8.13\\de.kai_morich.simple_usb_terminal.app-debug-32:\\xml_usb_device_filter.xml.flat",
         "source": "C:\\Users\\rencher7\\.gradle\\daemon\\8.13\\de.kai_morich.simple_usb_terminal.app-main-34:\\xml\\usb_device_filter.xml"
     },
@@ -62,10 +66,6 @@
     {
         "merged": "C:\\Users\\rencher7\\.gradle\\daemon\\8.13\\de.kai_morich.simple_usb_terminal.app-debug-32:\\drawable-xxhdpi_ic_notification.png.flat",
         "source": "C:\\Users\\rencher7\\.gradle\\daemon\\8.13\\de.kai_morich.simple_usb_terminal.app-main-34:\\drawable-xxhdpi\\ic_notification.png"
-    },
-    {
-        "merged": "de.kai_morich.simple_usb_terminal.app-debug-32:/menu_menu_terminal.xml.flat",
-        "source": "de.kai_morich.simple_usb_terminal.app-main-34:/menu/menu_terminal.xml"
     },
     {
         "merged": "C:\\Users\\rencher7\\.gradle\\daemon\\8.13\\de.kai_morich.simple_usb_terminal.app-debug-32:\\drawable-hdpi_ic_clear_white_24dp.png.flat",
